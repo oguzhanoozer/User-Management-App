@@ -90,7 +90,7 @@ class ServiceLocator {
 struct AppConfiguration {
     private static var _useMockServices: Bool = {
         #if DEBUG
-        return true
+        return false  // Changed to false - use real backend
         #else
         return false
         #endif

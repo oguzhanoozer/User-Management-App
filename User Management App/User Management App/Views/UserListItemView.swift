@@ -1,0 +1,67 @@
+//
+//  UserListItemView.swift
+//  User Management App
+//
+//  Created by oguzhan on 4.08.2025.
+//
+
+import SwiftUI
+
+struct UserListItemView: View {
+    let user: User
+    let onTap: () -> Void
+    
+    var body: some View {
+        LayoutComponents.userCardContainer {
+            HStack(spacing: Spacing.md) {
+                // User Avatar
+                Circle()
+                    .fill(Color.primaryBlue)
+                    .avatarSize(Layout.avatarMedium)
+                    .overlay(
+                        Text(user.initials)
+                            .font(.headline)
+                            .foregroundColor(.textOnPrimary)
+                            .fontWeight(.semibold)
+                    )
+                
+                // User Info
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Text(user.name)
+                        .cardTitleStyle()
+                        .multilineTextAlignment(.leading)
+                    
+                    Text(user.email)
+                        .cardSubtitleStyle()
+                        .multilineTextAlignment(.leading)
+                 
+                }
+                
+                Spacer()
+                
+                // Arrow Icon
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.textTertiary)
+                    .iconSize()
+            }
+        }
+        .onTapGesture {
+            onTap()
+        }
+    }
+}
+
+#Preview {
+    VStack(spacing: Spacing.md) {
+        UserListItemView(user: User.mockUser) {
+            print("User tapped")
+        }
+        
+        UserListItemView(user: User.mockUsers[1]) {
+            print("User tapped")
+        }
+    }
+    .screenPadding()
+    .background(Color.backgroundPrimary)
+    .applyTheme()
+}

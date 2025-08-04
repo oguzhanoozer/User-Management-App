@@ -8,13 +8,12 @@
 import SwiftUI
 
 extension Color {
-    static let primaryBlue = Color(hex: "4285F4")
-    static let primaryBlueLight = Color(hex: "5A94F5")
+    static let primaryBlue = Color(hex: "2260FF")
     static let primaryBlueDark = Color(hex: "3367D6")
     
     static let backgroundPrimary = Color(hex: "F8F9FA")
     static let backgroundSecondary = Color(hex: "FFFFFF")
-    static let cardBackground = Color(hex: "E8E4FF")
+    static let cardBackground = Color(hex: "CAD6FF")
     
     static let textPrimary = Color(hex: "1A1A1A")
     static let textSecondary = Color(hex: "6B7280")
@@ -55,46 +54,4 @@ extension Color {
     }
 }
 
-struct ThemeColors {
-    let primary: Color
-    let primaryLight: Color
-    let primaryDark: Color
-    
-    let backgroundPrimary: Color
-    let backgroundSecondary: Color
-    let cardBackground: Color
-    
-    let textPrimary: Color
-    let textSecondary: Color
-    let textTertiary: Color
-    let textOnPrimary: Color
-    
-    let border: Color
-    let shadow: Color
-    let separator: Color
-    
-    let success: Color
-    let warning: Color
-    let error: Color
-    let info: Color
-    
-    static let light = ThemeColors(
-        primary: .primaryBlue,
-        primaryLight: .primaryBlueLight,
-        primaryDark: .primaryBlueDark,
-        backgroundPrimary: .backgroundPrimary,
-        backgroundSecondary: .backgroundSecondary,
-        cardBackground: .cardBackground,
-        textPrimary: .textPrimary,
-        textSecondary: .textSecondary,
-        textTertiary: .textTertiary,
-        textOnPrimary: .textOnPrimary,
-        border: .borderColor,
-        shadow: .shadowColor,
-        separator: .separatorColor,
-        success: .successGreen,
-        warning: .warningOrange,
-        error: .errorRed,
-        info: .infoBlue
-    )
-}
+// Note: ThemeColors struct removed as it was not being used in the codebase

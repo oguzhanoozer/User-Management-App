@@ -15,20 +15,10 @@ class ThemeManager: ObservableObject {
     
     private init() {}
     
-    var colors: ThemeColors {
-        switch currentColorScheme {
-        case .light:
-            return ThemeColors.light
-        case .dark:
-            return ThemeColors.light // For now, we'll use light theme for both
-        @unknown default:
-            return ThemeColors.light
-        }
-    }
+    // ThemeColors struct removed - using direct Color extensions instead
 }
 
 struct AppTheme {
-    static var colors: ThemeColors { ThemeManager.shared.colors }
     static var spacing = Spacing.self
     static var layout = Layout.self
     static var typography = Typography.self
@@ -131,9 +121,7 @@ struct ThemePreview {
 }
 
 
-extension Color {
-    static var theme: ThemeColors { AppTheme.colors }
-}
+// Note: Color extension simplified - using direct Color.primaryBlue etc. instead of theme wrapper
 
 extension Font {
     static var theme: Typography.Type { Typography.self }

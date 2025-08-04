@@ -8,50 +8,36 @@
 import SwiftUI
 
 struct Layout {
+    // MARK: - Corner Radius
     static let cornerRadiusSmall: CGFloat = 8
     static let cornerRadiusMedium: CGFloat = 12
     static let cornerRadiusLarge: CGFloat = 16
-    static let cornerRadiusXLarge: CGFloat = 20
     
-
+    // MARK: - Card
     static let cardCornerRadius: CGFloat = 16
-    static let cardMinHeight: CGFloat = 80
-    static let cardElevation: CGFloat = 2
     
-
-    static let avatarSmall: CGFloat = 32
+    // MARK: - Avatar Sizes
     static let avatarMedium: CGFloat = 48
     static let avatarLarge: CGFloat = 60
     static let avatarXLarge: CGFloat = 100
     
-
+    // MARK: - Button
     static let buttonHeight: CGFloat = 44
-    static let buttonHeightSmall: CGFloat = 36
-    static let buttonHeightLarge: CGFloat = 52
     static let buttonCornerRadius: CGFloat = 12
     
-
-    static let iconSmall: CGFloat = 16
+    // MARK: - Icon Sizes
     static let iconMedium: CGFloat = 20
     static let iconLarge: CGFloat = 24
     static let iconXLarge: CGFloat = 32
     
-
+    // MARK: - Text Field
     static let textFieldHeight: CGFloat = 48
     static let textFieldCornerRadius: CGFloat = 8
-    static let pickerHeight: CGFloat = 40
     
-
-    static let navigationBarHeight: CGFloat = 44
-    static let tabBarHeight: CGFloat = 80
-    static let searchBarHeight: CGFloat = 40
-    
-
+    // MARK: - List
     static let listRowMinHeight: CGFloat = 60
-    static let refreshControlOffset: CGFloat = -60
     
-
-    static let maxContentWidth: CGFloat = 400
+    // MARK: - Touch Target
     static let minTapTargetSize: CGFloat = 44
 }
 
@@ -62,29 +48,8 @@ struct ShadowStyle {
     let x: CGFloat
     let y: CGFloat
     
-    static let none = ShadowStyle(color: .clear, radius: 0, x: 0, y: 0)
-    static let small = ShadowStyle(color: .shadowColor, radius: 2, x: 0, y: 1)
-    static let medium = ShadowStyle(color: .shadowColor, radius: 4, x: 0, y: 2)
-    static let large = ShadowStyle(color: .shadowColor, radius: 8, x: 0, y: 4)
-    
-
+    // Only keeping used shadow styles
     static let card = ShadowStyle(color: .shadowColor, radius: 4, x: 0, y: 2)
-    static let cardHover = ShadowStyle(color: .shadowColor, radius: 6, x: 0, y: 3)
-}
-
-
-struct BorderStyle {
-    let color: Color
-    let width: CGFloat
-    
-    static let none = BorderStyle(color: .clear, width: 0)
-    static let thin = BorderStyle(color: .borderColor, width: 0.5)
-    static let medium = BorderStyle(color: .borderColor, width: 1)
-    static let thick = BorderStyle(color: .borderColor, width: 2)
-    
-
-    static let textField = BorderStyle(color: .borderColor, width: 1)
-    static let card = BorderStyle(color: .borderColor.opacity(0.1), width: 0.5)
 }
 
 extension View {
@@ -96,11 +61,6 @@ extension View {
         self.cornerRadius(Layout.buttonCornerRadius)
     }
     
-    func customCornerRadius(_ radius: CGFloat) -> some View {
-        self.cornerRadius(radius)
-    }
-    
-
     func cardShadow() -> some View {
         let shadow = ShadowStyle.card
         return self.shadow(
@@ -111,28 +71,6 @@ extension View {
         )
     }
     
-    func customShadow(_ style: ShadowStyle) -> some View {
-        self.shadow(
-            color: style.color,
-            radius: style.radius,
-            x: style.x,
-            y: style.y
-        )
-    }
-    
-
-    func customBorder(_ style: BorderStyle) -> some View {
-        self.overlay(
-            Rectangle()
-                .stroke(style.color, lineWidth: style.width)
-        )
-    }
-    
-    func textFieldBorder() -> some View {
-        self.customBorder(.textField)
-    }
-    
-
     func avatarSize(_ size: CGFloat = Layout.avatarLarge) -> some View {
         self.frame(width: size, height: size)
     }
@@ -143,11 +81,6 @@ extension View {
     
     func iconSize(_ size: CGFloat = Layout.iconMedium) -> some View {
         self.frame(width: size, height: size)
-    }
-    
-
-    func minTapTarget() -> some View {
-        self.frame(minWidth: Layout.minTapTargetSize, minHeight: Layout.minTapTargetSize)
     }
 }
 
@@ -185,7 +118,10 @@ struct LayoutComponents {
             .buttonHeight()
             .background(Color.backgroundSecondary)
             .buttonCornerRadius()
-            .customBorder(.medium)
+            .overlay(
+                Rectangle()
+                    .stroke(Color.borderColor, lineWidth: 1)
+            )
             .foregroundColor(.textPrimary)
     }
 }

@@ -11,12 +11,14 @@ import Alamofire
 
 protocol UserServiceProtocol {
     func getUsers() async throws -> [User]
+    func getUsers(page: Int, limit: Int) async throws -> [User]
     func getUser(id: Int) async throws -> User
     func createUser(_ request: CreateUserRequest) async throws -> User
     func updateUser(id: Int, _ request: UpdateUserRequest) async throws -> User
     func deleteUser(id: Int) async throws -> DeleteUserResponse
     
     func getUsersPublisher() -> AnyPublisher<[User], APIError>
+    func getUsersPublisher(page: Int, limit: Int) -> AnyPublisher<[User], APIError>
     func getUserPublisher(id: Int) -> AnyPublisher<User, APIError>
     func createUserPublisher(_ request: CreateUserRequest) -> AnyPublisher<User, APIError>
     func updateUserPublisher(id: Int, _ request: UpdateUserRequest) -> AnyPublisher<User, APIError>
@@ -56,6 +58,19 @@ class UserService: UserServiceProtocol {
             await loadInitialData()
         }
         return allUsers
+    }
+    
+    func getUsers(page: Int, limit: Int) async throws -> [User] {
+        if useMockData {
+            // For mock data, simulate pagination
+            await loadInitialData()
+            let startIndex = (page - 1) * limit
+            let endIndex = min(startIndex + limit, allUsers.count)
+            guard startIndex < allUsers.count else { return [] }
+            return Array(allUsers[startIndex..<endIndex])
+        } else {
+            return try await realGetUsers(page: page, limit: limit)
+        }
     }
     
     func getUser(id: Int) async throws -> User {
@@ -166,6 +181,20 @@ class UserService: UserServiceProtocol {
             .eraseToAnyPublisher()
     }
     
+    func getUsersPublisher(page: Int, limit: Int) -> AnyPublisher<[User], APIError> {
+        return Future { promise in
+            Task {
+                do {
+                    let users = try await self.getUsers(page: page, limit: limit)
+                    promise(.success(users))
+                } catch {
+                    promise(.failure(error as? APIError ?? .unknown(error.localizedDescription)))
+                }
+            }
+        }
+        .eraseToAnyPublisher()
+    }
+    
     func getUserPublisher(id: Int) -> AnyPublisher<User, APIError> {
         return getUsersPublisher()
             .compactMap { users in
@@ -260,6 +289,32 @@ extension UserService {
                     case .success(let users):
                         continuation.resume(returning: users)
                     case .failure(let error):
+                        continuation.resume(throwing: self.mapError(error))
+                    }
+                }
+        }
+    }
+    
+    private func realGetUsers(page: Int, limit: Int) async throws -> [User] {
+        let url = APIConfiguration.baseURL + APIEndpoint.users.path
+        let parameters: [String: Any] = [
+            "_page": page,
+            "_limit": limit
+        ]
+        
+        print("🚀 BACKEND PAGINATION API CALL:")
+        print("GET \(url)?_page=\(page)&_limit=\(limit)")
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            session.request(url, method: .get, parameters: parameters)
+                .validate()
+                .responseDecodable(of: [User].self) { response in
+                    switch response.result {
+                    case .success(let users):
+                        print("✅ BACKEND RESPONSE: Received \(users.count) users for page \(page)")
+                        continuation.resume(returning: users)
+                    case .failure(let error):
+                        print("❌ BACKEND ERROR: \(error)")
                         continuation.resume(throwing: self.mapError(error))
                     }
                 }

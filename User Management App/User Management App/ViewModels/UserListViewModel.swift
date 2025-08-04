@@ -20,6 +20,9 @@ class UserListViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     
     @Published var paginationManager = PaginationManager<User>(pageSize: 5)
+    @Published var currentPage = 1
+    @Published var isLoadingPage = false
+    @Published var hasMorePages = true
     @Published var infiniteScrollManager = InfiniteScrollManager<User>(pageSize: 10)
     @Published var usePagination = true
     
@@ -58,26 +61,58 @@ class UserListViewModel: ObservableObject {
     }
     
     func loadUsers() {
-        guard !isLoading else { return }
+        loadUsersPage(page: 1, isRefresh: true)
+    }
+    
+    func loadUsersPage(page: Int, isRefresh: Bool = false) {
+        guard !isLoading && !isLoadingPage else { return }
         
-        isLoading = true
+        if isRefresh {
+            isLoading = true
+            currentPage = 1
+            users = []
+            hasMorePages = true
+        } else {
+            isLoadingPage = true
+        }
+        
         error = nil
         
         Task {
             do {
-                let fetchedUsers = try await userService.getUsers()
+                print("📄 Loading page \(page) with 5 users per page...")
+                let fetchedUsers = try await userService.getUsers(page: page, limit: 5)
+                
                 await MainActor.run {
-                    self.users = fetchedUsers
+                    if isRefresh {
+                        self.users = fetchedUsers
+                    } else {
+                        self.users.append(contentsOf: fetchedUsers)
+                    }
+                    
+                    self.currentPage = page
+                    self.hasMorePages = fetchedUsers.count == 5
                     self.updatePagination()
                     self.isLoading = false
+                    self.isLoadingPage = false
+                    
+                    print("✅ Page \(page) loaded: \(fetchedUsers.count) users")
+                    print("📊 Total users: \(self.users.count)")
                 }
             } catch {
                 await MainActor.run {
                     self.error = error as? APIError ?? .unknown(error.localizedDescription)
                     self.isLoading = false
+                    self.isLoadingPage = false
+                    print("❌ Failed to load page \(page): \(error)")
                 }
             }
         }
+    }
+    
+    func loadNextPage() {
+        guard hasMorePages && !isLoadingPage else { return }
+        loadUsersPage(page: currentPage + 1)
     }
     
     func refreshUsers() {
@@ -86,19 +121,12 @@ class UserListViewModel: ObservableObject {
         isRefreshing = true
         error = nil
         
+        print("🔄 Refreshing users - loading first page...")
+        loadUsersPage(page: 1, isRefresh: true)
+        
         Task {
-            do {
-                let fetchedUsers = try await userService.getUsers()
-                await MainActor.run {
-                    self.users = fetchedUsers
-                    self.updatePagination()
-                    self.isRefreshing = false
-                }
-            } catch {
-                await MainActor.run {
-                    self.error = error as? APIError ?? .unknown(error.localizedDescription)
-                    self.isRefreshing = false
-                }
+            await MainActor.run {
+                self.isRefreshing = false
             }
         }
     }
