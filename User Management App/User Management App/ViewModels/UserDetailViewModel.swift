@@ -6,10 +6,11 @@
 //
 
 import Foundation
-import Combine
 
 @MainActor
 class UserDetailViewModel: ObservableObject {
+    
+    // MARK: - Published Properties
     @Published var user: User?
     @Published var isLoading = false
     @Published var error: APIError?
@@ -17,97 +18,52 @@ class UserDetailViewModel: ObservableObject {
     @Published var isUpdating = false
     @Published var showDeleteConfirmation = false
     
+    // MARK: - Private Properties
     private let userService: UserServiceProtocol
-    private var cancellables = Set<AnyCancellable>()
     private let userId: Int
     
+    // MARK: - Computed Properties
     var hasError: Bool {
         error != nil
     }
     
     var errorMessage: String {
-        error?.errorDescription ?? "Unknown error"
+        if let error = error {
+            return APIError.localizedMessage(from: error)
+        }
+        return Strings.CommonErrors.unknown
     }
     
     var canPerformActions: Bool {
         !isLoading && !isDeleting && !isUpdating
     }
     
-    init(
-        userId: Int,
-        userService: UserServiceProtocol = ServiceLocator.shared.resolve(UserServiceProtocol.self)
-    ) {
+    // MARK: - Initialization
+    init(userId: Int) {
         self.userId = userId
-        self.userService = userService
+        self.userService = UserService()
     }
     
+    // MARK: - Public Methods
     func loadUser() {
-        guard !isLoading else { return }
-        
-        isLoading = true
-        error = nil
-        
-        Task {
-            do {
-                let fetchedUser = try await userService.getUser(id: userId)
-                await MainActor.run {
-                    self.user = fetchedUser
-                    self.isLoading = false
-                }
-            } catch {
-                await MainActor.run {
-                    self.error = error as? APIError ?? .unknown(error.localizedDescription)
-                    self.isLoading = false
-                }
-            }
+        guard !isLoading else {
+            print("⚠️ LoadUser blocked - already loading")
+            return
         }
+        
+        performUserLoad()
     }
     
-    func updateUser(_ updatedUser: User) {
-        guard !isUpdating else { return }
+    func updateUser(name: String, email: String) async -> Bool {
+        guard canUpdate else { return false }
         
-        isUpdating = true
-        error = nil
-        
-        let updateRequest = UpdateUserRequest(from: updatedUser)
-        
-        Task {
-            do {
-                let result = try await userService.updateUser(id: userId, updateRequest)
-                await MainActor.run {
-                    self.user = result
-                    self.isUpdating = false
-                }
-            } catch {
-                await MainActor.run {
-                    self.error = error as? APIError ?? .unknown(error.localizedDescription)
-                    self.isUpdating = false
-                }
-            }
-        }
+        return await performUserUpdate(name: name, email: email)
     }
     
-    func deleteUser() -> Bool {
-        guard !isDeleting, let user = user else { return false }
+    func deleteUser() async -> Bool {
+        guard canDelete else { return false }
         
-        isDeleting = true
-        error = nil
-        
-        Task {
-            do {
-                _ = try await userService.deleteUser(id: user.id)
-                await MainActor.run {
-                    self.isDeleting = false
-                }
-            } catch {
-                await MainActor.run {
-                    self.error = error as? APIError ?? .unknown(error.localizedDescription)
-                    self.isDeleting = false
-                }
-            }
-        }
-        
-        return true
+        return await performUserDeletion()
     }
     
     func confirmDelete() {
@@ -123,30 +79,178 @@ class UserDetailViewModel: ObservableObject {
     }
     
     func retryLoadUser() {
+        logRetryState()
+        resetUserState()
         loadUser()
     }
 }
 
-extension UserDetailViewModel {
-    func loadUserWithPublisher() {
-        guard !isLoading else { return }
+// MARK: - Private Methods - User Loading
+private extension UserDetailViewModel {
+    
+    var canUpdate: Bool {
+        !isUpdating && user != nil
+    }
+    
+    var canDelete: Bool {
+        !isDeleting && user != nil
+    }
+    
+    func performUserLoad() {
+        print("📱 LOAD USER \(userId) - Starting load process...")
         
+        setupLoadingState()
+        
+        Task {
+            await executeUserLoadAPI()
+        }
+    }
+    
+    func setupLoadingState() {
         isLoading = true
         error = nil
+    }
+    
+    func executeUserLoadAPI() async {
+        do {
+            print("🚀 Calling userService.getUser(id: \(userId))")
+            let fetchedUser = try await userService.getUser(id: userId)
+            await handleLoadSuccess(fetchedUser)
+            
+        } catch {
+            await handleLoadError(error)
+        }
+    }
+    
+    func handleLoadSuccess(_ fetchedUser: User) async {
+        await MainActor.run {
+            print("✅ USER \(self.userId) LOADED: \(fetchedUser.name)")
+            self.user = fetchedUser
+            self.isLoading = false
+        }
+    }
+    
+    func handleLoadError(_ error: Error) async {
+        await MainActor.run {
+            print("❌ USER \(self.userId) LOAD FAILED: \(error)")
+            self.error = error as? APIError ?? .unknown(Strings.CommonErrors.unknown)
+            self.isLoading = false
+        }
+    }
+}
+
+// MARK: - Private Methods - User Update
+private extension UserDetailViewModel {
+    
+    func performUserUpdate(name: String, email: String) async -> Bool {
+        guard let currentUser = user else { return false }
         
-        userService.getUserPublisher(id: userId)
-            .receive(on: DispatchQueue.main)
-            .sink(
-                receiveCompletion: { [weak self] (completion: Subscribers.Completion<APIError>) in
-                    self?.isLoading = false
-                    if case .failure(let error) = completion {
-                        self?.error = error
-                    }
-                },
-                receiveValue: { [weak self] user in
-                    self?.user = user
-                }
-            )
-            .store(in: &cancellables)
+        setupUpdateState()
+        
+        let updatedUser = createUpdatedUser(from: currentUser, name: name, email: email)
+        let updateRequest = UpdateUserRequest(from: updatedUser)
+        
+        return await executeUpdateAPI(with: updateRequest)
+    }
+    
+    func setupUpdateState() {
+        isUpdating = true
+        error = nil
+    }
+    
+    func createUpdatedUser(from currentUser: User, name: String, email: String) -> User {
+        return User(
+            id: currentUser.id,
+            name: name,
+            username: currentUser.username,
+            email: email,
+            address: currentUser.address,
+            phone: currentUser.phone,
+            website: currentUser.website,
+            company: currentUser.company
+        )
+    }
+    
+    func executeUpdateAPI(with request: UpdateUserRequest) async -> Bool {
+        do {
+            let result = try await userService.updateUser(id: userId, request)
+            return await handleUpdateSuccess(result)
+            
+        } catch {
+            return await handleUpdateError(error)
+        }
+    }
+    
+    func handleUpdateSuccess(_ updatedUser: User) async -> Bool {
+        await MainActor.run {
+            self.user = updatedUser
+            self.isUpdating = false
+        }
+        return true
+    }
+    
+    func handleUpdateError(_ error: Error) async -> Bool {
+        await MainActor.run {
+            self.error = error as? APIError ?? .unknown(Strings.CommonErrors.unknown)
+            self.isUpdating = false
+        }
+        return false
+    }
+}
+
+// MARK: - Private Methods - User Deletion
+private extension UserDetailViewModel {
+    
+    func performUserDeletion() async -> Bool {
+        guard let user = user else { return false }
+        
+        setupDeleteState()
+        
+        return await executeDeleteAPI(for: user)
+    }
+    
+    func setupDeleteState() {
+        isDeleting = true
+        error = nil
+    }
+    
+    func executeDeleteAPI(for user: User) async -> Bool {
+        do {
+            _ = try await userService.deleteUser(id: user.id)
+            return await handleDeleteSuccess()
+            
+        } catch {
+            return await handleDeleteError(error)
+        }
+    }
+    
+    func handleDeleteSuccess() async -> Bool {
+        await MainActor.run {
+            self.isDeleting = false
+        }
+        return true
+    }
+    
+    func handleDeleteError(_ error: Error) async -> Bool {
+        await MainActor.run {
+            self.error = error as? APIError ?? .unknown(Strings.CommonErrors.unknown)
+            self.isDeleting = false
+        }
+        return false
+    }
+}
+
+// MARK: - Private Methods - State Management
+private extension UserDetailViewModel {
+    
+    func logRetryState() {
+        print("🔄 RETRY USER \(userId) - Starting retry process...")
+        print("🔄 Current state: user=\(user?.name ?? "nil"), isLoading=\(isLoading), hasError=\(error != nil)")
+    }
+    
+    func resetUserState() {
+        error = nil
+        user = nil
+        print("🔄 State reset - calling loadUser()...")
     }
 }

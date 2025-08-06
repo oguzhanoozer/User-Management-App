@@ -20,136 +20,26 @@ struct UserListView: View {
                 Color.backgroundPrimary
                     .ignoresSafeArea()
                 
-                if viewModel.isLoading && viewModel.users.isEmpty {
-                    // Loading State
-                    VStack(spacing: Spacing.lg) {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .progressViewStyle(CircularProgressViewStyle(tint: .primaryBlue))
-                        
-                        Text(Strings.Loading.users)
-                            .captionStyle()
-                            .foregroundColor(.primaryBlue)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.backgroundPrimary.opacity(0.95))
-                    .screenPadding()
-                } else if viewModel.hasError && viewModel.users.isEmpty {
-                    // Error State
-                    VStack(spacing: Spacing.md) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .iconSize(Layout.iconXLarge)
-                            .foregroundColor(.errorRed)
-                        
-                        Text(Strings.Errors.general)
-                            .cardTitleStyle()
-                        
-                        Text(viewModel.errorMessage)
-                            .cardSubtitleStyle()
-                            .multilineTextAlignment(.center)
-                        
-                        LayoutComponents.primaryButton {
-                            Text(Strings.Actions.tryAgain)
-                        }
-                        .onTapGesture {
-                            viewModel.retryLoadUsers()
-                        }
-                    }
-                    .screenPadding()
-                } else {
-                                            // Content
-                        VStack(spacing: 0) {
-                            // User List
-                            ScrollView {
-                            RefreshableScrollView(
-                                isRefreshing: $viewModel.isRefreshing,
-                                onRefresh: {
-                                    viewModel.refreshUsers()
-                                }
-                            ) {
-                                LazyVStack(spacing: Spacing.md) {
-                                    ForEach(viewModel.filteredUsers) { user in
-                                        UserListItemView(user: user) {
-                                            isLoadingDetail = true
-                                            selectedUser = user
-                                            
-                                            // Simulate detail loading delay
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                                isLoadingDetail = false
-                                                showingDetail = true
-                                            }
-                                        }
-                                        .onAppear {
-                                            // Load next page when user reaches near end
-                                            if user.id == viewModel.filteredUsers.last?.id {
-                                                viewModel.loadNextPage()
-                                            }
-                                        }
-                                    }
-                                    
-                                    // Loading more indicator
-                                    if viewModel.isLoadingPage {
-                                        HStack {
-                                            ProgressView()
-                                                .scaleEffect(0.8)
-                                            Text(Strings.Loading.page)
-                                                .captionStyle()
-                                        }
-                                        .padding(.vertical, Spacing.md)
-                                    }
-                                    
-                                    // End of data indicator
-                                    if !viewModel.hasMorePages && !viewModel.users.isEmpty {
-                                        Text(Strings.Loading.allUsersLoaded)
-                                            .captionStyle()
-                                            .padding(.vertical, Spacing.md)
-                                    }
-                                }
-                                .screenPadding()
-                            }
-                        }
-                    }
-                            }
-            
-            // Detail Loading Overlay
-            if isLoadingDetail {
-                ZStack {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                    
-                    VStack(spacing: Spacing.md) {
-                        ProgressView()
-                            .scaleEffect(1.2)
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        
-                                                    Text(Strings.Loading.detail)
-                            .captionStyle()
-                            .foregroundColor(.white)
-                    }
-                    .padding(Spacing.xl)
-                    .background(Color.black.opacity(0.7))
-                    .cornerRadius(Layout.cornerRadiusMedium)
+                MainContentView(
+                    viewModel: viewModel,
+                    isLoadingDetail: $isLoadingDetail,
+                    selectedUser: $selectedUser,
+                    showingDetail: $showingDetail
+                )
+            }
+            .navigationBarTitleDisplayMode(.automatic)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    AddUserButton(
+                        showingAddUser: $showingAddUser,
+                        isDisabled: isLoadingDetail || viewModel.isLoading
+                    )
                 }
             }
-        }
-        .navigationTitle(Strings.Navigation.users)
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    showingAddUser = true
-                }) {
-                    Image(systemName: "plus")
-                        .foregroundColor(.primaryBlue)
-                }
-                .disabled(isLoadingDetail || viewModel.isLoading)
-            }
-        }
-
         }
         .sheet(isPresented: $showingDetail) {
             if let user = selectedUser {
-                UserDetailView(user: user)
+                UserDetailView(userId: user.id)
             }
         }
         .sheet(isPresented: $showingAddUser) {
@@ -158,21 +48,231 @@ struct UserListView: View {
             }
         }
         .onAppear {
-            loadRealData()
+            if viewModel.users.isEmpty && !viewModel.isLoading {
+                loadRealData()
+            }
+        }
+        .onChange(of: viewModel.hasError) { hasError in
+            print("🎯 Error state changed: \(hasError)")
+            if !hasError {
+                print("✅ Error cleared successfully!")
+            }
         }
     }
     
     private func loadRealData() {
-        // Load users from real backend API with pagination
         print("🚀 Loading users from real backend API with pagination (5 per page)...")
         viewModel.loadUsers()
     }
-    
-
 }
 
+// MARK: - Main Content View
+struct MainContentView: View {
+    @ObservedObject var viewModel: UserListViewModel
+    @Binding var isLoadingDetail: Bool
+    @Binding var selectedUser: User?
+    @Binding var showingDetail: Bool
+    
+    var body: some View {
+        Group {
+            if viewModel.isLoading && viewModel.users.isEmpty {
+                LoadingView()
+            } else if viewModel.hasError && viewModel.users.isEmpty {
+                ErrorView(viewModel: viewModel)
+            } else {
+                UserListContentView(
+                    viewModel: viewModel,
+                    isLoadingDetail: $isLoadingDetail,
+                    selectedUser: $selectedUser,
+                    showingDetail: $showingDetail
+                )
+            }
+        }
+    }
+}
 
+// MARK: - Loading View
+struct LoadingView: View {
+    var body: some View {
+        VStack(spacing: Spacing.lg) {
+            AppProgressView.primary
 
+            
+            Text(Strings.Loading.users)
+                .captionStyle()
+                .foregroundColor(.primaryBlue)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.backgroundPrimary.opacity(0.95))
+        .screenPadding()
+    }
+}
+
+// MARK: - Error View
+struct ErrorView: View {
+    @ObservedObject var viewModel: UserListViewModel
+    
+    var body: some View {
+        VStack(spacing: Spacing.md) {
+            Image(systemName: "exclamationmark.triangle")
+                .iconSize(Layout.iconXLarge)
+                .foregroundColor(.errorRed)
+            
+            Text(viewModel.errorMessage)
+                .cardTitleStyle()
+                .multilineTextAlignment(.center)
+            
+            RetryButton {
+                print("🔴 RETRY BUTTON PRESSED")
+                viewModel.retryLoadUsers()
+            }
+            .disabled(viewModel.isLoading)
+        }
+        .screenPadding()
+    }
+}
+
+// MARK: - User List Content View
+struct UserListContentView: View {
+    @ObservedObject var viewModel: UserListViewModel
+    @Binding var isLoadingDetail: Bool
+    @Binding var selectedUser: User?
+    @Binding var showingDetail: Bool
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                RefreshableScrollView(
+                    isRefreshing: $viewModel.isRefreshing,
+                    onRefresh: {
+                        viewModel.refreshUsers()
+                    }
+                ) {
+                    LazyVStack(spacing: Spacing.md) {
+                        UserItemsList(
+                            users: viewModel.filteredUsers,
+                            onUserTap: { user in
+                                handleUserTap(user: user)
+                            },
+                            onLoadNextPage: {
+                                viewModel.loadNextPage()
+                            }
+                        )
+                        
+                        PaginationFooter(viewModel: viewModel)
+                    }
+                    .screenPadding()
+                }
+            }
+        }
+    }
+    
+    private func handleUserTap(user: User) {
+        isLoadingDetail = true
+        selectedUser = user
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            isLoadingDetail = false
+            showingDetail = true
+        }
+    }
+}
+
+// MARK: - User Items List
+struct UserItemsList: View {
+    let users: [User]
+    let onUserTap: (User) -> Void
+    let onLoadNextPage: () -> Void
+    
+    var body: some View {
+        ForEach(users) { user in
+            UserListItemView(user: user) {
+                onUserTap(user)
+            }
+            .onAppear {
+                if user.id == users.last?.id {
+                    onLoadNextPage()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Pagination Footer
+struct PaginationFooter: View {
+    @ObservedObject var viewModel: UserListViewModel
+    
+    var body: some View {
+        Group {
+            if viewModel.isLoadingPage {
+                LoadingPageIndicator()
+            }
+            
+            if !viewModel.hasMorePages && !viewModel.users.isEmpty {
+                AllUsersLoadedIndicator()
+            }
+        }
+    }
+}
+
+// MARK: - Loading Page Indicator
+struct LoadingPageIndicator: View {
+    var body: some View {
+        HStack {
+            AppProgressView.custom(scale: 0.8, tint: .primary)
+
+            Text(Strings.Loading.page)
+                .captionStyle()
+        }
+        .padding(.vertical, Spacing.md)
+    }
+}
+
+// MARK: - All Users Loaded Indicator
+struct AllUsersLoadedIndicator: View {
+    var body: some View {
+        Text(Strings.Loading.allUsersLoaded)
+            .captionStyle()
+            .padding(.vertical, Spacing.md)
+    }
+}
+
+// MARK: - Add User Button
+struct AddUserButton: View {
+    @Binding var showingAddUser: Bool
+    let isDisabled: Bool
+    
+    var body: some View {
+        Button(action: {
+            showingAddUser = true
+        }) {
+            Image(systemName: "plus")
+                .foregroundColor(.primaryBlue)
+        }
+        .disabled(isDisabled)
+    }
+}
+
+// MARK: - Retry Button
+struct RetryButton: View {
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Image(systemName: "arrow.clockwise")
+                Text(Strings.Actions.tryAgain)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.primaryBlue)
+            .foregroundColor(.white)
+            .cornerRadius(Layout.buttonCornerRadius)
+        }
+    }
+}
+
+// MARK: - Refreshable Scroll View
 struct RefreshableScrollView<Content: View>: View {
     @Binding var isRefreshing: Bool
     let onRefresh: () -> Void
@@ -191,8 +291,6 @@ struct RefreshableScrollView<Content: View>: View {
             }
     }
 }
-
-
 
 #Preview {
     UserListView()

@@ -6,46 +6,25 @@
 //
 
 import Foundation
-import Combine
 
 @MainActor
 class UserListViewModel: ObservableObject {
+    // MARK: - Published Properties
     @Published var users: [User] = []
     @Published var isLoading = false
     @Published var error: APIError?
-    @Published var searchText = ""
     @Published var isRefreshing = false
-    
-    private let userService: UserServiceProtocol
-    private var cancellables = Set<AnyCancellable>()
-    
-    @Published var paginationManager = PaginationManager<User>(pageSize: 5)
     @Published var currentPage = 1
     @Published var isLoadingPage = false
     @Published var hasMorePages = true
-    @Published var infiniteScrollManager = InfiniteScrollManager<User>(pageSize: 10)
-    @Published var usePagination = true
     
+    // MARK: - Private Properties
+    private let pageSize = 5
+    private let userService: UserServiceProtocol
+    
+    // MARK: - Computed Properties
     var filteredUsers: [User] {
-        if searchText.isEmpty {
-            return users
-        }
-        return users.filter { user in
-            user.name.localizedCaseInsensitiveContains(searchText) ||
-            user.email.localizedCaseInsensitiveContains(searchText) ||
-            user.username.localizedCaseInsensitiveContains(searchText)
-        }
-    }
-    
-    var displayUsers: [User] {
-        let filtered = filteredUsers
-        if usePagination {
-            paginationManager.updateItems(filtered)
-            return paginationManager.currentPageItems
-        } else {
-            infiniteScrollManager.updateAllItems(filtered)
-            return infiniteScrollManager.displayedItems
-        }
+        return users
     }
     
     var hasError: Bool {
@@ -53,61 +32,21 @@ class UserListViewModel: ObservableObject {
     }
     
     var errorMessage: String {
-        error?.errorDescription ?? "Unknown error"
+        if let error = error {
+            return APIError.localizedMessage(from: error)
+        }
+        return Strings.CommonErrors.unknown
     }
     
-    init(userService: UserServiceProtocol = ServiceLocator.shared.resolve(UserServiceProtocol.self)) {
-        self.userService = userService
+    // MARK: - Initialization
+    init() {
+        self.userService = UserService()
     }
     
+    // MARK: - Public Methods
     func loadUsers() {
+        print("📱 LOAD USERS - Starting load process...")
         loadUsersPage(page: 1, isRefresh: true)
-    }
-    
-    func loadUsersPage(page: Int, isRefresh: Bool = false) {
-        guard !isLoading && !isLoadingPage else { return }
-        
-        if isRefresh {
-            isLoading = true
-            currentPage = 1
-            users = []
-            hasMorePages = true
-        } else {
-            isLoadingPage = true
-        }
-        
-        error = nil
-        
-        Task {
-            do {
-                print("📄 Loading page \(page) with 5 users per page...")
-                let fetchedUsers = try await userService.getUsers(page: page, limit: 5)
-                
-                await MainActor.run {
-                    if isRefresh {
-                        self.users = fetchedUsers
-                    } else {
-                        self.users.append(contentsOf: fetchedUsers)
-                    }
-                    
-                    self.currentPage = page
-                    self.hasMorePages = fetchedUsers.count == 5
-                    self.updatePagination()
-                    self.isLoading = false
-                    self.isLoadingPage = false
-                    
-                    print("✅ Page \(page) loaded: \(fetchedUsers.count) users")
-                    print("📊 Total users: \(self.users.count)")
-                }
-            } catch {
-                await MainActor.run {
-                    self.error = error as? APIError ?? .unknown(error.localizedDescription)
-                    self.isLoading = false
-                    self.isLoadingPage = false
-                    print("❌ Failed to load page \(page): \(error)")
-                }
-            }
-        }
     }
     
     func loadNextPage() {
@@ -117,102 +56,187 @@ class UserListViewModel: ObservableObject {
     
     func refreshUsers() {
         guard !isRefreshing else { return }
-        
-        isRefreshing = true
-        error = nil
-        
-        print("🔄 Refreshing users - loading first page...")
-        loadUsersPage(page: 1, isRefresh: true)
-        
-        Task {
-            await MainActor.run {
-                self.isRefreshing = false
-            }
-        }
+        performRefresh()
+    }
+    
+    func retryLoadUsers() {
+        logRetryState()
+        resetState()
+        loadUsers()
     }
     
     func deleteUser(_ user: User) {
-        Task {
-            do {
-                _ = try await userService.deleteUser(id: user.id)
-                await MainActor.run {
-                    self.users.removeAll { $0.id == user.id }
-                    self.updatePagination()
-                }
-            } catch {
-                await MainActor.run {
-                    self.error = error as? APIError ?? .unknown(error.localizedDescription)
-                }
-            }
+        performDeleteUser(user)
+    }
+    
+    func addUser(_ user: User) {
+        users.append(user)
+    }
+    
+    func updateUser(_ updatedUser: User) {
+        if let index = users.firstIndex(where: { $0.id == updatedUser.id }) {
+            users[index] = updatedUser
         }
     }
     
     func clearError() {
         error = nil
     }
-    
-    func retryLoadUsers() {
-        loadUsers()
-    }
-    
-    func addUser(_ user: User) {
-        users.append(user)
-        updatePagination()
-    }
-    
-    func updateUser(_ updatedUser: User) {
-        if let index = users.firstIndex(where: { $0.id == updatedUser.id }) {
-            users[index] = updatedUser
-            updatePagination()
-        }
-    }
-    
-    func togglePaginationMode() {
-        usePagination.toggle()
-        updatePagination()
-    }
-    
-    private func updatePagination() {
-        let filtered = filteredUsers
-        if usePagination {
-            paginationManager.updateItems(filtered)
-        } else {
-            infiniteScrollManager.updateAllItems(filtered)
-        }
-    }
-    
-    func searchTextChanged() {
-        updatePagination()
-    }
-    
-    func loadMoreIfNeeded(for user: User) {
-        if !usePagination && infiniteScrollManager.shouldLoadMore(currentItem: user) {
-            infiniteScrollManager.loadNextBatch()
-        }
-    }
 }
 
-extension UserListViewModel {
-    func loadUsersWithPublisher() {
-        guard !isLoading else { return }
+// MARK: - Private Methods
+private extension UserListViewModel {
+    
+    func loadUsersPage(page: Int, isRefresh: Bool = false) {
+        guard !isLoading && !isLoadingPage else {
+            print("⚠️ LoadUsersPage blocked - isLoading=\(isLoading), isLoadingPage=\(isLoadingPage)")
+            return
+        }
         
-        isLoading = true
+        print("📄 LOAD USERS PAGE \(page) - isRefresh=\(isRefresh)")
+        
+        setupLoadingState(for: page, isRefresh: isRefresh)
+        
+        Task {
+            await performAPICall(for: page, isRefresh: isRefresh)
+        }
+    }
+    
+    func setupLoadingState(for page: Int, isRefresh: Bool) {
+        if isRefresh {
+            isLoading = true
+            currentPage = 1
+            users = []
+            hasMorePages = true
+            error = nil
+        } else {
+            isLoadingPage = true
+        }
+    }
+    
+    func performAPICall(for page: Int, isRefresh: Bool) async {
+        do {
+            print("📄 Loading page \(page) with \(pageSize) users per page...")
+            let fetchedUsers = try await userService.getUsers(page: page, limit: pageSize)
+            
+            print("🎉 API SUCCESS - Received \(fetchedUsers.count) users")
+            
+            await handleSuccessResponse(fetchedUsers, for: page, isRefresh: isRefresh)
+            
+        } catch {
+            print("💥 API ERROR: \(error)")
+            await handleErrorResponse(error, for: page)
+        }
+    }
+    
+    func handleSuccessResponse(_ fetchedUsers: [User], for page: Int, isRefresh: Bool) async {
+        await MainActor.run {
+            self.error = nil
+            
+            if isRefresh {
+                self.users = fetchedUsers
+            } else {
+                self.users.append(contentsOf: fetchedUsers)
+            }
+            
+            self.currentPage = page
+            self.hasMorePages = fetchedUsers.count == self.pageSize
+            self.isLoading = false
+            self.isLoadingPage = false
+            
+            print("✅ Page \(page) loaded: \(fetchedUsers.count) users")
+            print("📊 Total users: \(self.users.count)")
+        }
+    }
+    
+    func handleErrorResponse(_ error: Error, for page: Int) async {
+        await MainActor.run {
+            self.error = error as? APIError ?? .unknown(Strings.CommonErrors.unknown)
+            self.isLoading = false
+            self.isLoadingPage = false
+            print("❌ Failed to load page \(page): \(error)")
+        }
+    }
+    
+    func performRefresh() {
+        isRefreshing = true
         error = nil
         
-        userService.getUsersPublisher()
-            .receive(on: DispatchQueue.main)
-            .sink(
-                receiveCompletion: { [weak self] completion in
-                    self?.isLoading = false
-                    if case .failure(let error) = completion {
-                        self?.error = error
-                    }
-                },
-                receiveValue: { [weak self] users in
-                    self?.users = users
-                    self?.updatePagination()
+        print("🔄 Refreshing users - loading first page...")
+        
+        Task {
+            do {
+                print("📄 Refresh: Loading page 1 with \(pageSize) users per page...")
+                let fetchedUsers = try await userService.getUsers(page: 1, limit: pageSize)
+                
+                await handleRefreshSuccess(fetchedUsers)
+                
+            } catch {
+                await handleRefreshError(error)
+            }
+        }
+    }
+    
+    func handleRefreshSuccess(_ fetchedUsers: [User]) async {
+        await MainActor.run {
+            self.error = nil
+            self.users = fetchedUsers
+            self.currentPage = 1
+            self.hasMorePages = fetchedUsers.count == self.pageSize
+            self.isRefreshing = false
+            
+            print("✅ Refresh completed: \(fetchedUsers.count) users")
+            print("📊 Total users after refresh: \(self.users.count)")
+        }
+    }
+    
+    func handleRefreshError(_ error: Error) async {
+        await MainActor.run {
+            self.error = error as? APIError ?? .unknown(Strings.CommonErrors.unknown)
+            self.isRefreshing = false
+            print("❌ Failed to refresh: \(error)")
+        }
+    }
+    
+    func performDeleteUser(_ user: User) {
+        Task {
+            do {
+                _ = try await userService.deleteUser(id: user.id)
+                await MainActor.run {
+                    self.users.removeAll { $0.id == user.id }
                 }
-            )
-            .store(in: &cancellables)
+            } catch {
+                await MainActor.run {
+                    self.error = error as? APIError ?? .unknown(Strings.CommonErrors.unknown)
+                }
+            }
+        }
+    }
+    
+    func logRetryState() {
+        print("🔄 RETRY USERS - Starting retry process...")
+        print("🔄 Current state before retry:")
+        print("   - users.count: \(users.count)")
+        print("   - isLoading: \(isLoading)")
+        print("   - hasError: \(error != nil)")
+        print("   - error: \(String(describing: error))")
+    }
+    
+    func resetState() {
+        error = nil
+        users = []
+        currentPage = 1
+        hasMorePages = true
+        isLoadingPage = false
+        isRefreshing = false
+        isLoading = false
+        
+        print("🔄 State cleared - New state:")
+        print("   - users.count: \(users.count)")
+        print("   - isLoading: \(isLoading)")
+        print("   - hasError: \(error != nil)")
+        print("   - error: \(String(describing: error))")
+        
+        print("🔄 Calling loadUsers()...")
     }
 }

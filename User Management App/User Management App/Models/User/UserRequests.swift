@@ -11,22 +11,26 @@ extension Encodable {
     func asDictionary() throws -> [String: Any] {
         let data = try JSONEncoder().encode(self)
         guard let dictionary = try JSONSerialization.jsonObject(with: data, options: .allowFragments) as? [String: Any] else {
-            throw NSError(domain: "EncodingError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to convert to dictionary"])
+            throw NSError(domain: "EncodingError", code: 0, userInfo: [NSLocalizedDescriptionKey: Strings.CommonErrors.encodingFailed])
         }
         return dictionary
     }
+}
+
+struct CreateUserResponse: Codable {
+    let id: Int
 }
 
 struct CreateUserRequest: Codable {
     let name: String
     let username: String
     let email: String
-    let address: CreateAddressRequest
+    let address: CreateAddressRequest?
     let phone: String
-    let website: String
-    let company: CreateCompanyRequest
+    let website: String?
+    let company: CreateCompanyRequest?
     
-    init(name: String, username: String, email: String, address: CreateAddressRequest, phone: String, website: String, company: CreateCompanyRequest) {
+    init(name: String, username: String, email: String, address: CreateAddressRequest? = nil, phone: String, website: String? = nil, company: CreateCompanyRequest? = nil) {
         self.name = name
         self.username = username
         self.email = email
@@ -141,5 +145,5 @@ struct DeleteUserResponse: Codable {
     let success: Bool
     let message: String?
     
-    static let success = DeleteUserResponse(success: true, message: "User deleted successfully")
+    static let success = DeleteUserResponse(success: true, message: Strings.API.userDeletedSuccess)
 }

@@ -14,7 +14,6 @@ struct UserListItemView: View {
     var body: some View {
         LayoutComponents.userCardContainer {
             HStack(spacing: Spacing.md) {
-                // User Avatar
                 Circle()
                     .fill(Color.primaryBlue)
                     .avatarSize(Layout.avatarMedium)
@@ -25,7 +24,6 @@ struct UserListItemView: View {
                             .fontWeight(.semibold)
                     )
                 
-                // User Info
                 VStack(alignment: .leading, spacing: Spacing.xs) {
                     Text(user.name)
                         .cardTitleStyle()
@@ -39,7 +37,6 @@ struct UserListItemView: View {
                 
                 Spacer()
                 
-                // Arrow Icon
                 Image(systemName: "chevron.right")
                     .foregroundColor(.textTertiary)
                     .iconSize()

@@ -13,16 +13,9 @@ protocol UserServiceProtocol {
     func getUsers() async throws -> [User]
     func getUsers(page: Int, limit: Int) async throws -> [User]
     func getUser(id: Int) async throws -> User
-    func createUser(_ request: CreateUserRequest) async throws -> User
+    func realCreateUser(_ request: CreateUserRequest) async throws -> User
     func updateUser(id: Int, _ request: UpdateUserRequest) async throws -> User
     func deleteUser(id: Int) async throws -> DeleteUserResponse
-    
-    func getUsersPublisher() -> AnyPublisher<[User], APIError>
-    func getUsersPublisher(page: Int, limit: Int) -> AnyPublisher<[User], APIError>
-    func getUserPublisher(id: Int) -> AnyPublisher<User, APIError>
-    func createUserPublisher(_ request: CreateUserRequest) -> AnyPublisher<User, APIError>
-    func updateUserPublisher(id: Int, _ request: UpdateUserRequest) -> AnyPublisher<User, APIError>
-    func deleteUserPublisher(id: Int) -> AnyPublisher<DeleteUserResponse, APIError>
 }
 
 class UserService: UserServiceProtocol {
@@ -41,11 +34,7 @@ class UserService: UserServiceProtocol {
     }
     
     init() {
-        #if DEBUG
-        self.useMockData = AppConfiguration.useMockServices
-        #else
         self.useMockData = false
-        #endif
         
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = APIConfiguration.timeoutInterval
@@ -61,14 +50,18 @@ class UserService: UserServiceProtocol {
     }
     
     func getUsers(page: Int, limit: Int) async throws -> [User] {
+        print("🎯 UserService.getUsers called - page: \(page), limit: \(limit)")
+        print("🎯 useMockData: \(useMockData)")
+        
         if useMockData {
-            // For mock data, simulate pagination
+            print("🎯 Using mock data path")
             await loadInitialData()
             let startIndex = (page - 1) * limit
             let endIndex = min(startIndex + limit, allUsers.count)
             guard startIndex < allUsers.count else { return [] }
             return Array(allUsers[startIndex..<endIndex])
         } else {
+            print("🎯 Using real API path - calling realGetUsers")
             return try await realGetUsers(page: page, limit: limit)
         }
     }
@@ -78,41 +71,22 @@ class UserService: UserServiceProtocol {
             return user
         }
         
-        if !deletedUserIds.contains(id) && id <= 10 {
+        if !deletedUserIds.contains(id) {
             if useMockData {
-                return try await getMockUser(id: id)
+                if id <= 10 {
+                    return try await getMockUser(id: id)
+                }
             } else {
                 return try await getRealUser(id: id)
             }
         }
         
-        throw APIError.serverError(404, "User not found")
-    }
-    
-    func createUser(_ request: CreateUserRequest) async throws -> User {
-        let optimisticUser = User.fromRequest(request, id: nextLocalId)
-        
-        nextLocalId += 1
-        localUsers.append(optimisticUser)
-        
-        Task {
-            do {
-                if useMockData {
-                    try await mockCreateUser(request)
-                } else {
-                    try await realCreateUser(request)
-                }
-            } catch {
-                await MainActor.run {
-                    self.localUsers.removeAll { $0.id == optimisticUser.id }
-                }
-            }
-        }
-        
-        return optimisticUser
+        throw APIError.serverError(404, Strings.CommonErrors.userNotFound)
     }
     
     func updateUser(id: Int, _ request: UpdateUserRequest) async throws -> User {
+        print("🔄 UserService.updateUser called for id: \(id)")
+        
         let createRequest = CreateUserRequest(
             name: request.name,
             username: request.username,
@@ -124,21 +98,27 @@ class UserService: UserServiceProtocol {
         )
         let updatedUser = User.fromRequest(createRequest, id: id)
         
-        if let index = apiUsers.firstIndex(where: { $0.id == id }) {
-            apiUsers[index] = updatedUser
-        } else if let index = localUsers.firstIndex(where: { $0.id == id }) {
-            localUsers[index] = updatedUser
+        // First call the API - if it fails, throw error
+        do {
+            if useMockData {
+                print("🎯 Using mock update")
+                try await mockUpdateUser(id: id, request)
+            } else {
+                print("🎯 Calling real API update")
+                try await realUpdateUser(id: id, request)
+            }
+            print("✅ API update successful")
+        } catch {
+            print("❌ API update failed: \(error)")
+            throw error
         }
         
-        Task {
-            do {
-                if useMockData {
-                    try await mockUpdateUser(id: id, request)
-                } else {
-                    try await realUpdateUser(id: id, request)
-                }
-            } catch {
-                print("Update failed: \(error)")
+        // Only update local data if API call succeeded
+        await MainActor.run {
+            if let index = self.apiUsers.firstIndex(where: { $0.id == id }) {
+                self.apiUsers[index] = updatedUser
+            } else if let index = self.localUsers.firstIndex(where: { $0.id == id }) {
+                self.localUsers[index] = updatedUser
             }
         }
         
@@ -146,104 +126,32 @@ class UserService: UserServiceProtocol {
     }
     
     func deleteUser(id: Int) async throws -> DeleteUserResponse {
-        if apiUsers.contains(where: { $0.id == id }) {
-            deletedUserIds.insert(id)
+        print("🗑️ UserService.deleteUser called for id: \(id)")
+        
+        // First call the API - if it fails, throw error
+        do {
+            if useMockData {
+                print("🎯 Using mock delete")
+                try await mockDeleteUser(id: id)
+            } else {
+                print("🎯 Calling real API delete")
+                try await realDeleteUser(id: id)
+            }
+            print("✅ API delete successful")
+        } catch {
+            print("❌ API delete failed: \(error)")
+            throw error
         }
         
-        localUsers.removeAll { $0.id == id }
-        
-        Task {
-            do {
-                if useMockData {
-                    try await mockDeleteUser(id: id)
-                } else {
-                    try await realDeleteUser(id: id)
-                }
-            } catch {
-                print("Delete failed: \(error)")
+        // Only update local data if API call succeeded
+        await MainActor.run {
+            if self.apiUsers.contains(where: { $0.id == id }) {
+                self.deletedUserIds.insert(id)
             }
+            self.localUsers.removeAll { $0.id == id }
         }
         
         return DeleteUserResponse.success
-    }
-    
-    func getUsersPublisher() -> AnyPublisher<[User], APIError> {
-        if apiUsers.isEmpty {
-            Task { await loadInitialData() }
-        }
-        
-        return Publishers.CombineLatest3($apiUsers, $localUsers, $deletedUserIds)
-            .map { apiUsers, localUsers, deletedIds in
-                let validApiUsers = apiUsers.filter { !deletedIds.contains($0.id) }
-                return validApiUsers + localUsers
-            }
-            .setFailureType(to: APIError.self)
-            .eraseToAnyPublisher()
-    }
-    
-    func getUsersPublisher(page: Int, limit: Int) -> AnyPublisher<[User], APIError> {
-        return Future { promise in
-            Task {
-                do {
-                    let users = try await self.getUsers(page: page, limit: limit)
-                    promise(.success(users))
-                } catch {
-                    promise(.failure(error as? APIError ?? .unknown(error.localizedDescription)))
-                }
-            }
-        }
-        .eraseToAnyPublisher()
-    }
-    
-    func getUserPublisher(id: Int) -> AnyPublisher<User, APIError> {
-        return getUsersPublisher()
-            .compactMap { users in
-                users.first { $0.id == id }
-            }
-            .first()
-            .eraseToAnyPublisher()
-    }
-    
-    func createUserPublisher(_ request: CreateUserRequest) -> AnyPublisher<User, APIError> {
-        return Future { promise in
-            Task {
-                do {
-                    let user = try await self.createUser(request)
-                    promise(.success(user))
-                } catch {
-                    promise(.failure(error as? APIError ?? .unknown(error.localizedDescription)))
-                }
-            }
-        }
-        .eraseToAnyPublisher()
-    }
-    
-    func updateUserPublisher(id: Int, _ request: UpdateUserRequest) -> AnyPublisher<User, APIError> {
-        return Future { promise in
-            Task {
-                do {
-                    let user = try await self.updateUser(id: id, request)
-                    promise(.success(user))
-                } catch {
-                    promise(.failure(error as? APIError ?? .unknown(error.localizedDescription)))
-                }
-            }
-        }
-        .eraseToAnyPublisher()
-    }
-    
-    func deleteUserPublisher(id: Int) -> AnyPublisher<DeleteUserResponse, APIError> {
-        return Future { promise in
-            Task {
-                do {
-                    let response = try await self.deleteUser(id: id)
-                    promise(.success(response))
-                } catch {
-                    promise(.failure(error as? APIError ?? .unknown(error.localizedDescription)))
-                }
-            }
-        }
-        .eraseToAnyPublisher()
     }
     
     @MainActor
@@ -263,78 +171,75 @@ class UserService: UserServiceProtocol {
 }
 
 extension UserService {
-    func reset() {
-        apiUsers = []
-        localUsers = []
-        deletedUserIds = []
-        nextLocalId = 1000
-    }
-    
-    func getLocalUsersCount() -> Int {
-        return localUsers.count
-    }
-    
-    func getDeletedUsersCount() -> Int {
-        return deletedUserIds.count
-    }
     
     private func realGetUsers() async throws -> [User] {
         let url = APIConfiguration.baseURL + APIEndpoint.users.path
         
-        return try await withCheckedThrowingContinuation { continuation in
-            session.request(url, method: .get)
-                .validate()
-                .responseDecodable(of: [User].self) { response in
-                    switch response.result {
-                    case .success(let users):
-                        continuation.resume(returning: users)
-                    case .failure(let error):
-                        continuation.resume(throwing: self.mapError(error))
+        return try await withRetry(maxAttempts: 3, delay: 1.0) {
+            return try await withCheckedThrowingContinuation { continuation in
+                self.session.request(url, method: .get)
+                    .validate()
+                    .responseDecodable(of: [User].self) { response in
+                        switch response.result {
+                        case .success(let users):
+                            continuation.resume(returning: users)
+                        case .failure(let error):
+                            continuation.resume(throwing: self.mapError(error))
+                        }
                     }
-                }
+            }
         }
     }
     
     private func realGetUsers(page: Int, limit: Int) async throws -> [User] {
-        let url = APIConfiguration.baseURL + APIEndpoint.users.path
+        print("🎯 realGetUsers called - page: \(page), limit: \(limit)")
+        
+        let url =  APIConfiguration.baseURL + APIEndpoint.users.path
+        print("************************ \(url)")
         let parameters: [String: Any] = [
             "_page": page,
             "_limit": limit
         ]
         
+        print("🎯 URL: \(url)")
+        print("🎯 Parameters: \(parameters)")
         print("🚀 BACKEND PAGINATION API CALL:")
         print("GET \(url)?_page=\(page)&_limit=\(limit)")
         
-        return try await withCheckedThrowingContinuation { continuation in
-            session.request(url, method: .get, parameters: parameters)
-                .validate()
-                .responseDecodable(of: [User].self) { response in
-                    switch response.result {
-                    case .success(let users):
-                        print("✅ BACKEND RESPONSE: Received \(users.count) users for page \(page)")
-                        continuation.resume(returning: users)
-                    case .failure(let error):
-                        print("❌ BACKEND ERROR: \(error)")
-                        continuation.resume(throwing: self.mapError(error))
+        return try await withRetry(maxAttempts: 3, delay: 1.0) {
+            return try await withCheckedThrowingContinuation { continuation in
+                self.session.request(url, method: .get, parameters: parameters)
+                    .validate()
+                    .responseDecodable(of: [User].self) { response in
+                        switch response.result {
+                        case .success(let users):
+                            print("✅ BACKEND RESPONSE: Received \(users.count) users for page \(page)")
+                            continuation.resume(returning: users)
+                        case .failure(let error):
+                            print("❌ BACKEND ERROR: \(error)")
+                            continuation.resume(throwing: self.mapError(error))
+                        }
                     }
-                }
+            }
         }
     }
     
     private func getRealUser(id: Int) async throws -> User {
         let url = APIConfiguration.baseURL + APIEndpoint.user.pathWithID(id)
         
-        return try await withCheckedThrowingContinuation { continuation in
-            session.request(url, method: .get)
-                .validate()
-                .responseDecodable(of: User.self) { response in
-                    switch response.result {
-                    case .success(let user):
-                        continuation.resume(returning: user)
-                    case .failure(let error):
-                        continuation.resume(throwing: self.mapError(error))
+        return try await withRetry(maxAttempts: 3, delay: 1.0) {
+            return try await withCheckedThrowingContinuation { continuation in
+                self.session.request(url, method: .get)
+                    .validate()
+                    .responseDecodable(of: User.self) { response in
+                        switch response.result {
+                        case .success(let user):
+                            continuation.resume(returning: user)
+                        case .failure(let error):
+                            continuation.resume(throwing: self.mapError(error))
+                        }
                     }
-                }
+            }
         }
     }
     
@@ -342,27 +247,32 @@ extension UserService {
         try await Task.sleep(nanoseconds: 500_000_000)
         
         guard let user = User.mockUsers.first(where: { $0.id == id }) else {
-            throw APIError.serverError(404, "User not found")
+            throw APIError.serverError(404, Strings.CommonErrors.userNotFound)
         }
         return user
     }
     
-    private func realCreateUser(_ request: CreateUserRequest) async throws {
+    func realCreateUser(_ request: CreateUserRequest) async throws -> User {
         let url = APIConfiguration.baseURL + APIEndpoint.users.path
         let parameters = try request.asDictionary()
         
-        return try await withCheckedThrowingContinuation { continuation in
-            session.request(url, method: .post, parameters: parameters, encoding: JSONEncoding.default)
-                .validate()
-                .response { response in
-                    switch response.result {
-                    case .success:
-                        continuation.resume()
-                    case .failure(let error):
-                        continuation.resume(throwing: self.mapError(error))
+        let response = try await withRetry(maxAttempts: 3, delay: 1.0) {
+            return try await withCheckedThrowingContinuation { continuation in
+                self.session.request(url, method: .post, parameters: parameters, encoding: JSONEncoding.default)
+                    .validate()
+                    .responseDecodable(of: CreateUserResponse.self) { response in
+                        switch response.result {
+                        case .success(let createResponse):
+                            continuation.resume(returning: createResponse)
+                        case .failure(let error):
+                            continuation.resume(throwing: self.mapError(error))
+                        }
                     }
-                }
+            }
         }
+        
+        let createdUser = User.fromRequest(request, id: response.id)
+        return createdUser
     }
     
     private func mockCreateUser(_ request: CreateUserRequest) async throws {
@@ -373,17 +283,19 @@ extension UserService {
         let url = APIConfiguration.baseURL + APIEndpoint.user.pathWithID(id)
         let parameters = try request.asDictionary()
         
-        return try await withCheckedThrowingContinuation { continuation in
-            session.request(url, method: .put, parameters: parameters, encoding: JSONEncoding.default)
-                .validate()
-                .response { response in
-                    switch response.result {
-                    case .success:
-                        continuation.resume()
-                    case .failure(let error):
-                        continuation.resume(throwing: self.mapError(error))
+        return try await withRetry(maxAttempts: 3, delay: 1.0) {
+            return try await withCheckedThrowingContinuation { continuation in
+                self.session.request(url, method: .put, parameters: parameters, encoding: JSONEncoding.default)
+                    .validate()
+                    .response { response in
+                        switch response.result {
+                        case .success:
+                            continuation.resume()
+                        case .failure(let error):
+                            continuation.resume(throwing: self.mapError(error))
+                        }
                     }
-                }
+            }
         }
     }
     
@@ -394,22 +306,57 @@ extension UserService {
     private func realDeleteUser(id: Int) async throws {
         let url = APIConfiguration.baseURL + APIEndpoint.user.pathWithID(id)
         
-        return try await withCheckedThrowingContinuation { continuation in
-            session.request(url, method: .delete)
-                .validate()
-                .response { response in
-                    switch response.result {
-                    case .success:
-                        continuation.resume()
-                    case .failure(let error):
-                        continuation.resume(throwing: self.mapError(error))
+        return try await withRetry(maxAttempts: 3, delay: 1.0) {
+            return try await withCheckedThrowingContinuation { continuation in
+                self.session.request(url, method: .delete)
+                    .validate()
+                    .response { response in
+                        switch response.result {
+                        case .success:
+                            continuation.resume()
+                        case .failure(let error):
+                            continuation.resume(throwing: self.mapError(error))
+                        }
                     }
-                }
+            }
         }
     }
     
     private func mockDeleteUser(id: Int) async throws {
         try await Task.sleep(nanoseconds: 500_000_000)
+    }
+    
+    // MARK: - Retry Mechanism
+    private func withRetry<T>(
+        maxAttempts: Int,
+        delay: TimeInterval,
+        operation: @escaping () async throws -> T
+    ) async throws -> T {
+        var lastError: Error?
+        
+        for attempt in 1...maxAttempts {
+            do {
+                print("🔄 Attempt \(attempt)/\(maxAttempts)")
+                let result = try await operation()
+                if attempt > 1 {
+                    print("✅ Retry succeeded on attempt \(attempt)")
+                }
+                return result
+            } catch {
+                lastError = error
+                print("❌ Attempt \(attempt) failed: \(error)")
+                
+                // Son deneme değilse bekle
+                if attempt < maxAttempts {
+                    let retryDelay = delay * Double(attempt) // Exponential backoff
+                    print("⏳ Retrying in \(retryDelay) seconds...")
+                    try await Task.sleep(nanoseconds: UInt64(retryDelay * 1_000_000_000))
+                }
+            }
+        }
+        
+        print("💥 All retry attempts failed")
+        throw lastError ?? APIError.unknown("All retry attempts failed")
     }
     
     private nonisolated func mapError(_ error: AFError) -> APIError {
@@ -422,14 +369,14 @@ extension UserService {
                 let message = HTTPURLResponse.localizedString(forStatusCode: code)
                 return .serverError(code, message)
             default:
-                return .networkError(error.localizedDescription)
+                return .networkError(Strings.CommonErrors.invalidResponse)
             }
         case .responseSerializationFailed(let reason):
             switch reason {
-            case .decodingFailed(let decodingError):
-                return .decodingError(decodingError.localizedDescription)
+            case .decodingFailed(_):
+                return .decodingError(Strings.CommonErrors.decodingFailed)
             default:
-                return .decodingError(error.localizedDescription)
+                return .decodingError(Strings.CommonErrors.decodingFailed)
             }
         case .sessionTaskFailed(let sessionError):
             if let urlError = sessionError as? URLError {
@@ -439,12 +386,12 @@ extension UserService {
                 case .notConnectedToInternet, .networkConnectionLost:
                     return .noInternetConnection
                 default:
-                    return .networkError(urlError.localizedDescription)
+                    return .networkError(Strings.CommonErrors.networkTimeout)
                 }
             }
-            return .networkError(sessionError.localizedDescription)
+            return .networkError(Strings.CommonErrors.networkTimeout)
         default:
-            return .unknown(error.localizedDescription)
+            return .unknown(Strings.CommonErrors.unknown)
         }
     }
 }

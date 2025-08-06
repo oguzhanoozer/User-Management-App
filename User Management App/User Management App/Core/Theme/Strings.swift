@@ -9,19 +9,19 @@ import Foundation
 
 struct Strings {
     
-    // MARK: - App
+    
     struct App {
         static let title = "User Management"
         static let subtitle = "App"
     }
     
-    // MARK: - Navigation Titles
+    
     struct Navigation {
         static let users = "Users"
         static let newUser = "New User"
     }
     
-    // MARK: - Common Actions
+    
     struct Actions {
         static let cancel = "Cancel"
         static let ok = "OK"
@@ -32,7 +32,7 @@ struct Strings {
         static let add = "Add"
     }
     
-    // MARK: - Loading States
+    
     struct Loading {
         static let users = "Loading users..."
         static let detail = "Loading details..."
@@ -45,7 +45,7 @@ struct Strings {
         static let allUsersLoaded = "All users loaded"
     }
     
-    // MARK: - Error Messages
+    
     struct Errors {
         static let general = "Error"
         static let serverResponse = "❌ Server response error!\n\nPlease try again."
@@ -83,7 +83,7 @@ struct Strings {
         }
     }
     
-    // MARK: - Success Messages
+    
     struct Success {
         static func userCreated(name: String, email: String, phone: String, id: Int) -> String {
             return "✅ User added to real backend!\n\n👤 \(name)\n📧 \(email)\n📞 \(phone)\n🆔 ID: \(id)"
@@ -98,7 +98,7 @@ struct Strings {
         }
     }
     
-    // MARK: - Form Fields
+    
     struct FormFields {
         static let fullName = "Full Name"
         static let username = "Username"
@@ -107,7 +107,7 @@ struct Strings {
         static let name = "Name"
     }
     
-    // MARK: - Form Placeholders
+    
     struct Placeholders {
         static let fullName = "e.g. John Doe"
         static let username = "e.g. johndoe"
@@ -117,7 +117,7 @@ struct Strings {
         static let emailField = "Email"
     }
     
-    // MARK: - Form Validation
+    
     struct Validation {
         static let fillAllFields = "❌ Please fill all fields correctly"
         
@@ -145,7 +145,7 @@ struct Strings {
         }
     }
     
-    // MARK: - Detail Sections
+    
     struct DetailSections {
         static let contactInfo = "Contact Information"
         static let addressInfo = "Address Information"
@@ -153,7 +153,7 @@ struct Strings {
         static let personalInfo = "Personal Information"
     }
     
-    // MARK: - Detail Row Titles
+    
     struct DetailRows {
         static let email = "Email"
         static let phone = "Phone"
@@ -168,7 +168,7 @@ struct Strings {
         static let sendEmail = "Send Email"
     }
     
-    // MARK: - Form Sections
+    
     struct FormSections {
         static let newUser = "Add New User"
         static let userInfo = "User Information"
@@ -176,9 +176,44 @@ struct Strings {
         static let updateUserInfo = "Update user information"
     }
     
-    // MARK: - Alert Titles
+    
     struct AlertTitles {
         static let result = "Operation Result"
         static let deleteConfirmation = "Are you sure you want to delete this user?"
+        static let editUser = "Edit User"
+        static let deleteUser = "Delete User"
+    }
+    
+    
+    struct Buttons {
+        static let addUser = "Add User"
+        static let addingUser = "Adding User..."
+        static let updateUser = "Update User"
+        static let deleteUser = "Delete User"
+        static let retryLoad = "Retry Load"
+    }
+    
+    
+    struct Detail {
+        static let zipCode = "Zip Code"
+        static let slogan = "Slogan"
+        static let businessField = "Business Field"
+        static let memberSince = "Member since 2019"
+    }
+    
+    
+    struct CommonErrors {
+        static let unknown = "Unknown error"
+        static let userNotFound = "User not found"
+        static let encodingFailed = "Failed to convert to dictionary"
+        static let networkTimeout = "Network timeout"
+        static let noInternetConnection = "No internet connection"
+        static let invalidResponse = "Invalid server response"
+        static let decodingFailed = "Failed to decode server response"
+    }
+    
+    
+    struct API {
+        static let userDeletedSuccess = "User deleted successfully"
     }
 }

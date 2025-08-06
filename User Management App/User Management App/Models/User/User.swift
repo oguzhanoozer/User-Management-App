@@ -18,10 +18,19 @@ struct User: Codable, Identifiable, Equatable, Hashable {
     let company: Company
     
     var initials: String {
-        let nameComponents = name.components(separatedBy: " ")
-        let firstInitial = nameComponents.first?.first ?? Character("")
-        let lastInitial = nameComponents.count > 1 ? nameComponents.last?.first ?? Character("") : Character("")
-        return "\(firstInitial)\(lastInitial)".uppercased()
+        let nameComponents = name.components(separatedBy: " ").filter { !$0.isEmpty }
+        guard let firstComponent = nameComponents.first, !firstComponent.isEmpty else {
+            return ""
+        }
+        
+        let firstInitial = firstComponent.first ?? Character("")
+        
+        if nameComponents.count > 1, let lastComponent = nameComponents.last, !lastComponent.isEmpty {
+            let lastInitial = lastComponent.first ?? Character("")
+            return "\(firstInitial)\(lastInitial)".uppercased()
+        } else {
+            return "\(firstInitial)".uppercased()
+        }
     }
     
     var fullAddress: String {
@@ -33,7 +42,7 @@ struct User: Codable, Identifiable, Equatable, Hashable {
     }
     
     var memberSince: String {
-        return "Member since 2019"
+        return Strings.Detail.memberSince
     }
 }
 
@@ -84,18 +93,21 @@ extension User {
             username: request.username,
             email: request.email,
             address: Address(
-                street: request.address.street,
-                suite: request.address.suite,
-                city: request.address.city,
-                zipcode: request.address.zipcode,
-                geo: Geo(lat: request.address.geo.lat, lng: request.address.geo.lng)
+                street: request.address?.street ?? "Unknown Street",
+                suite: request.address?.suite ?? "Unknown Suite",
+                city: request.address?.city ?? "Unknown City",
+                zipcode: request.address?.zipcode ?? "00000",
+                geo: Geo(
+                    lat: request.address?.geo.lat ?? "0.0", 
+                    lng: request.address?.geo.lng ?? "0.0"
+                )
             ),
             phone: request.phone,
-            website: request.website,
+            website: request.website ?? "\(request.username).org",
             company: Company(
-                name: request.company.name,
-                catchPhrase: request.company.catchPhrase,
-                bs: request.company.bs
+                name: request.company?.name ?? "Default Company",
+                catchPhrase: request.company?.catchPhrase ?? "Innovation at its best",
+                bs: request.company?.bs ?? "cutting-edge solutions"
             )
         )
     }

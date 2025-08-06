@@ -21,7 +21,6 @@ struct SplashView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: Spacing.lg) {
-                    // App Icon/Logo placeholder
                     Circle()
                         .fill(Color.primaryBlue)
                         .frame(width: 120, height: 120)
@@ -32,9 +31,8 @@ struct SplashView: View {
                         )
                         .scaleEffect(size)
                         .opacity(opacity)
-                    
-                    // App Title
-                    VStack(spacing: Spacing.sm) {
+                                
+            VStack(spacing: Spacing.sm) {
                         Text(Strings.App.title)
                             .font(.largeTitle)
                             .fontWeight(.bold)
@@ -55,7 +53,6 @@ struct SplashView: View {
                     self.opacity = 1.0
                 }
                 
-                // Navigate to main app after animation
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     withAnimation(.easeInOut(duration: 0.5)) {
                         self.isActive = true
