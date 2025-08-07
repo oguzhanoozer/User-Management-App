@@ -40,7 +40,7 @@ class UserListViewModel: ObservableObject {
     }
     
     func loadUsers() {
-        print("📱 LOAD USERS - Starting load process...")
+        Logger.lifecycle("Starting load process", component: "UserListViewModel")
         loadUsersPage(page: 1, isRefresh: true)
     }
     
@@ -83,11 +83,11 @@ private extension UserListViewModel {
     
     func loadUsersPage(page: Int, isRefresh: Bool = false) {
         guard !isLoading && !isLoadingPage else {
-            print("⚠️ LoadUsersPage blocked - isLoading=\(isLoading), isLoadingPage=\(isLoadingPage)")
+            Logger.warning("LoadUsersPage blocked - isLoading=\(isLoading), isLoadingPage=\(isLoadingPage)", category: .viewModel)
             return
         }
         
-        print("📄 LOAD USERS PAGE \(page) - isRefresh=\(isRefresh)")
+        Logger.info("Loading users page \(page), isRefresh: \(isRefresh)", category: .viewModel)
         
         setupLoadingState(for: page, isRefresh: isRefresh)
         
@@ -110,15 +110,15 @@ private extension UserListViewModel {
     
     func performAPICall(for page: Int, isRefresh: Bool) async {
         do {
-            print("📄 Loading page \(page) with \(pageSize) users per page...")
+            Logger.dataFlow("Loading page \(page) with \(pageSize) users per page")
             let fetchedUsers = try await userService.getUsers(page: page, limit: pageSize)
             
-            print("🎉 API SUCCESS - Received \(fetchedUsers.count) users")
+            Logger.apiSuccess("Received \(fetchedUsers.count) users")
             
             await handleSuccessResponse(fetchedUsers, for: page, isRefresh: isRefresh)
             
         } catch {
-            print("💥 API ERROR: \(error)")
+            Logger.apiError(error)
             await handleErrorResponse(error, for: page)
         }
     }
@@ -138,8 +138,8 @@ private extension UserListViewModel {
             self.isLoading = false
             self.isLoadingPage = false
             
-            print("✅ Page \(page) loaded: \(fetchedUsers.count) users")
-            print("📊 Total users: \(self.users.count)")
+            Logger.dataFlow("Page \(page) loaded", count: fetchedUsers.count)
+            Logger.dataFlow("Total users", count: self.users.count)
         }
     }
     
@@ -148,7 +148,7 @@ private extension UserListViewModel {
             self.error = error as? APIError ?? .unknown(Strings.CommonErrors.unknown)
             self.isLoading = false
             self.isLoadingPage = false
-            print("❌ Failed to load page \(page): \(error)")
+            Logger.error("Failed to load page \(page): \(error)", category: .viewModel)
         }
     }
     
@@ -156,11 +156,11 @@ private extension UserListViewModel {
         isRefreshing = true
         error = nil
         
-        print("🔄 Refreshing users - loading first page...")
+        Logger.lifecycle("Refreshing users - loading first page", component: "UserListViewModel")
         
         Task {
             do {
-                print("📄 Refresh: Loading page 1 with \(pageSize) users per page...")
+                Logger.dataFlow("Refresh: Loading page 1 with \(pageSize) users per page")
                 let fetchedUsers = try await userService.getUsers(page: 1, limit: pageSize)
                 
                 await handleRefreshSuccess(fetchedUsers)
@@ -179,8 +179,8 @@ private extension UserListViewModel {
             self.hasMorePages = fetchedUsers.count == self.pageSize
             self.isRefreshing = false
             
-            print("✅ Refresh completed: \(fetchedUsers.count) users")
-            print("📊 Total users after refresh: \(self.users.count)")
+            Logger.dataFlow("Refresh completed", count: fetchedUsers.count)
+            Logger.dataFlow("Total users after refresh", count: self.users.count)
         }
     }
     
@@ -188,7 +188,7 @@ private extension UserListViewModel {
         await MainActor.run {
             self.error = error as? APIError ?? .unknown(Strings.CommonErrors.unknown)
             self.isRefreshing = false
-            print("❌ Failed to refresh: \(error)")
+            Logger.error("Failed to refresh: \(error)", category: .viewModel)
         }
     }
     
@@ -208,12 +208,11 @@ private extension UserListViewModel {
     }
     
     func logRetryState() {
-        print("🔄 RETRY USERS - Starting retry process...")
-        print("🔄 Current state before retry:")
-        print("   - users.count: \(users.count)")
-        print("   - isLoading: \(isLoading)")
-        print("   - hasError: \(error != nil)")
-        print("   - error: \(String(describing: error))")
+        Logger.info("Starting retry process", category: .viewModel)
+        Logger.debug("Current state before retry - users.count: \(users.count), isLoading: \(isLoading), hasError: \(error != nil)", category: .viewModel)
+        if let error = error {
+            Logger.debug("Error: \(String(describing: error))", category: .viewModel)
+        }
     }
     
     func resetState() {
@@ -225,12 +224,11 @@ private extension UserListViewModel {
         isRefreshing = false
         isLoading = false
         
-        print("🔄 State cleared - New state:")
-        print("   - users.count: \(users.count)")
-        print("   - isLoading: \(isLoading)")
-        print("   - hasError: \(error != nil)")
-        print("   - error: \(String(describing: error))")
+        Logger.debug("State cleared - users.count: \(users.count), isLoading: \(isLoading), hasError: \(error != nil)", category: .viewModel)
+        if let error = error {
+            Logger.debug("Error: \(String(describing: error))", category: .viewModel)
+        }
         
-        print("🔄 Calling loadUsers()...")
+        Logger.info("Calling loadUsers after state reset", category: .viewModel)
     }
 }

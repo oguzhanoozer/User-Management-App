@@ -50,18 +50,18 @@ class UserService: UserServiceProtocol {
     }
     
     func getUsers(page: Int, limit: Int) async throws -> [User] {
-        print("🎯 UserService.getUsers called - page: \(page), limit: \(limit)")
-        print("🎯 useMockData: \(useMockData)")
+        Logger.info("getUsers called", category: .api)
+        Logger.debug("page: \(page), limit: \(limit), useMockData: \(useMockData)", category: .api)
         
         if useMockData {
-            print("🎯 Using mock data path")
+            Logger.debug("Using mock data path", category: .api)
             await loadInitialData()
             let startIndex = (page - 1) * limit
             let endIndex = min(startIndex + limit, allUsers.count)
             guard startIndex < allUsers.count else { return [] }
             return Array(allUsers[startIndex..<endIndex])
         } else {
-            print("🎯 Using real API path - calling realGetUsers")
+            Logger.debug("Using real API path - calling realGetUsers", category: .api)
             return try await realGetUsers(page: page, limit: limit)
         }
     }
@@ -85,7 +85,7 @@ class UserService: UserServiceProtocol {
     }
     
     func updateUser(id: Int, _ request: UpdateUserRequest) async throws -> User {
-        print("🔄 UserService.updateUser called for id: \(id)")
+        Logger.info("updateUser called for id: \(id)", category: .api)
         
         let createRequest = CreateUserRequest(
             name: request.name,
@@ -100,15 +100,15 @@ class UserService: UserServiceProtocol {
         
         do {
             if useMockData {
-                print("🎯 Using mock update")
+                Logger.debug("Using mock update", category: .api)
                 try await mockUpdateUser(id: id, request)
             } else {
-                print("🎯 Calling real API update")
+                Logger.debug("Calling real API update", category: .api)
                 try await realUpdateUser(id: id, request)
             }
-            print("✅ API update successful")
+            Logger.apiSuccess("User update successful", endpoint: "updateUser")
         } catch {
-            print("❌ API update failed: \(error)")
+            Logger.apiError(error, endpoint: "updateUser")
             throw error
         }
         
@@ -124,19 +124,19 @@ class UserService: UserServiceProtocol {
     }
     
     func deleteUser(id: Int) async throws -> DeleteUserResponse {
-        print("🗑️ UserService.deleteUser called for id: \(id)")
+        Logger.info("deleteUser called for id: \(id)", category: .api)
         
         do {
             if useMockData {
-                print("🎯 Using mock delete")
+                Logger.debug("Using mock delete", category: .api)
                 try await mockDeleteUser(id: id)
             } else {
-                print("🎯 Calling real API delete")
+                Logger.debug("Calling real API delete", category: .api)
                 try await realDeleteUser(id: id)
             }
-            print("✅ API delete successful")
+            Logger.apiSuccess("User delete successful", endpoint: "deleteUser")
         } catch {
-            print("❌ API delete failed: \(error)")
+            Logger.apiError(error, endpoint: "deleteUser")
             throw error
         }
         
@@ -161,7 +161,7 @@ class UserService: UserServiceProtocol {
                 self.apiUsers = users
             }
         } catch {
-            print("Failed to load initial data: \(error)")
+            Logger.error("Failed to load initial data: \(error)", category: .api)
         }
     }
 }
@@ -188,7 +188,7 @@ extension UserService {
     }
     
     private func realGetUsers(page: Int, limit: Int) async throws -> [User] {
-        print("🎯 realGetUsers called - page: \(page), limit: \(limit)")
+        Logger.debug("realGetUsers called - page: \(page), limit: \(limit)", category: .api)
         
         let url =  APIConfiguration.baseURL + APIEndpoint.users.path
         let parameters: [String: Any] = [
@@ -197,7 +197,7 @@ extension UserService {
         ]
         
         
-        print("GET \(url)?_page=\(page)&_limit=\(limit)")
+        Logger.networkRequest(method: "GET", url: "\(url)?_page=\(page)&_limit=\(limit)")
         
         return try await withRetry(maxAttempts: 3, delay: 1.0) {
             return try await withCheckedThrowingContinuation { continuation in
@@ -206,10 +206,12 @@ extension UserService {
                     .responseDecodable(of: [User].self) { response in
                         switch response.result {
                         case .success(let users):
-                            print("✅ BACKEND RESPONSE: Received \(users.count) users for page \(page)")
+                            Logger.networkResponse(url: url, statusCode: 200)
+                            Logger.dataFlow("Received users for page \(page)", count: users.count)
                             continuation.resume(returning: users)
                         case .failure(let error):
-                            print("❌ BACKEND ERROR: \(error)")
+                            Logger.networkResponse(url: url, statusCode: 500)
+                            Logger.apiError(error, endpoint: "getUsers")
                             continuation.resume(throwing: self.mapError(error))
                         }
                     }
@@ -328,10 +330,10 @@ extension UserService {
         
         for attempt in 1...maxAttempts {
             do {
-                print("🔄 Attempt \(attempt)/\(maxAttempts)")
+                Logger.retry("Network operation", attempt: attempt, maxAttempts: maxAttempts)
                 let result = try await operation()
                 if attempt > 1 {
-                    print("✅ Retry succeeded on attempt \(attempt)")
+                    Logger.info("Retry succeeded on attempt \(attempt)", category: .network)
                 }
                 return result
             } catch {
@@ -339,13 +341,13 @@ extension UserService {
                 
                 if attempt < maxAttempts {
                     let retryDelay = delay * Double(attempt)
-                    print("⏳ Retrying in \(retryDelay) seconds...")
+                    Logger.info("Retrying in \(retryDelay) seconds...", category: .network)
                     try await Task.sleep(nanoseconds: UInt64(retryDelay * 1_000_000_000))
                 }
             }
         }
         
-        print("💥 All retry attempts failed")
+        Logger.error("All retry attempts failed", category: .network)
         throw lastError ?? APIError.unknown("All retry attempts failed")
     }
     

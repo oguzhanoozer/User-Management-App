@@ -53,15 +53,15 @@ struct UserListView: View {
             }
         }
         .onChange(of: viewModel.hasError) { hasError in
-            print("🎯 Error state changed: \(hasError)")
+            Logger.viewModelState("UserListView", state: "hasError", value: hasError)
             if !hasError {
-                print("✅ Error cleared successfully!")
+                Logger.info("Error cleared successfully", category: .ui)
             }
         }
     }
     
     private func loadRealData() {
-        print("🚀 Loading users from real backend API with pagination (5 per page)...")
+        Logger.lifecycle("Loading users from real backend API with pagination (5 per page)", component: "UserListView")
         viewModel.loadUsers()
     }
 }
@@ -120,7 +120,7 @@ struct ErrorView: View {
                 .multilineTextAlignment(.center)
             
             RetryButton {
-                print("🔴 RETRY BUTTON PRESSED")
+                Logger.userAction("Retry button pressed")
                 viewModel.retryLoadUsers()
             }
             .disabled(viewModel.isLoading)

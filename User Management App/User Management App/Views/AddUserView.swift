@@ -425,7 +425,7 @@ struct FieldError: View {
 
 #Preview {
     AddUserView { user in
-        print("User added: \(user.name)")
+        Logger.userAction("User added", details: "Name: \(user.name)")
     }
     .applyTheme()
 }

@@ -243,15 +243,11 @@ private extension AddUserViewModel {
 private extension AddUserViewModel {
     
     func logCreationSuccess(_ user: User) {
-        print("✅ USER CREATED SUCCESSFULLY:")
-        print("- ID: \(user.id)")
-        print("- Name: \(user.name)")
-        print("- Username: \(user.username)")
-        print("- Email: \(user.email)")
-        print("- Phone: \(user.phone)")
+        Logger.apiSuccess("User created successfully")
+        Logger.debug("Created user - ID: \(user.id), Name: \(user.name), Username: \(user.username), Email: \(user.email), Phone: \(user.phone)", category: .api)
     }
     
     func logCreationError(_ error: Error) {
-        print("❌ USER CREATION FAILED: \(error)")
+        Logger.apiError(error, endpoint: "createUser")
     }
 }

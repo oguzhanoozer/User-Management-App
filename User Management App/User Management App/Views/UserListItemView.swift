@@ -43,6 +43,7 @@ struct UserListItemView: View {
             }
         }
         .onTapGesture {
+            Logger.userAction("User item tapped", details: "User ID: \(user.id)")
             onTap()
         }
     }
@@ -51,11 +52,11 @@ struct UserListItemView: View {
 #Preview {
     VStack(spacing: Spacing.md) {
         UserListItemView(user: User.mockUser) {
-            print("User tapped")
+            // User tap handled in onTapGesture
         }
         
         UserListItemView(user: User.mockUsers[1]) {
-            print("User tapped")
+            // User tap handled in onTapGesture
         }
     }
     .screenPadding()

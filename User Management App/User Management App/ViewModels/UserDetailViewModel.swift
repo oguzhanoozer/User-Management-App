@@ -42,7 +42,7 @@ class UserDetailViewModel: ObservableObject {
     
     func loadUser() {
         guard !isLoading else {
-            print("⚠️ LoadUser blocked - already loading")
+            Logger.warning("LoadUser blocked - already loading", category: .viewModel)
             return
         }
         
@@ -91,7 +91,7 @@ private extension UserDetailViewModel {
     }
     
     func performUserLoad() {
-        print("📱 LOAD USER \(userId) - Starting load process...")
+        Logger.lifecycle("Starting load process for user \(userId)", component: "UserDetailViewModel")
         
         setupLoadingState()
         
@@ -107,7 +107,7 @@ private extension UserDetailViewModel {
     
     func executeUserLoadAPI() async {
         do {
-            print("🚀 Calling userService.getUser(id: \(userId))")
+            Logger.debug("Calling userService.getUser(id: \(userId))", category: .api)
             let fetchedUser = try await userService.getUser(id: userId)
             await handleLoadSuccess(fetchedUser)
             
@@ -118,7 +118,7 @@ private extension UserDetailViewModel {
     
     func handleLoadSuccess(_ fetchedUser: User) async {
         await MainActor.run {
-            print("✅ USER \(self.userId) LOADED: \(fetchedUser.name)")
+            Logger.apiSuccess("User \(self.userId) loaded: \(fetchedUser.name)")
             self.user = fetchedUser
             self.isLoading = false
         }
@@ -126,7 +126,7 @@ private extension UserDetailViewModel {
     
     func handleLoadError(_ error: Error) async {
         await MainActor.run {
-            print("❌ USER \(self.userId) LOAD FAILED: \(error)")
+            Logger.error("User \(self.userId) load failed: \(error)", category: .viewModel)
             self.error = error as? APIError ?? .unknown(Strings.CommonErrors.unknown)
             self.isLoading = false
         }
@@ -235,13 +235,13 @@ private extension UserDetailViewModel {
 private extension UserDetailViewModel {
     
     func logRetryState() {
-        print("🔄 RETRY USER \(userId) - Starting retry process...")
-        print("🔄 Current state: user=\(user?.name ?? "nil"), isLoading=\(isLoading), hasError=\(error != nil)")
+        Logger.info("Starting retry process for user \(userId)", category: .viewModel)
+        Logger.debug("Current state: user=\(user?.name ?? "nil"), isLoading=\(isLoading), hasError=\(error != nil)", category: .viewModel)
     }
     
     func resetUserState() {
         error = nil
         user = nil
-        print("🔄 State reset - calling loadUser()...")
+        Logger.info("State reset - calling loadUser", category: .viewModel)
     }
 }
