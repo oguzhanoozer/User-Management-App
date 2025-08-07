@@ -66,7 +66,6 @@ struct UserListView: View {
     }
 }
 
-// MARK: - Main Content View
 struct MainContentView: View {
     @ObservedObject var viewModel: UserListViewModel
     @Binding var isLoadingDetail: Bool
@@ -91,7 +90,6 @@ struct MainContentView: View {
     }
 }
 
-// MARK: - Loading View
 struct LoadingView: View {
     var body: some View {
         VStack(spacing: Spacing.lg) {
@@ -108,7 +106,6 @@ struct LoadingView: View {
     }
 }
 
-// MARK: - Error View
 struct ErrorView: View {
     @ObservedObject var viewModel: UserListViewModel
     
@@ -132,7 +129,6 @@ struct ErrorView: View {
     }
 }
 
-// MARK: - User List Content View
 struct UserListContentView: View {
     @ObservedObject var viewModel: UserListViewModel
     @Binding var isLoadingDetail: Bool
@@ -178,7 +174,6 @@ struct UserListContentView: View {
     }
 }
 
-// MARK: - User Items List
 struct UserItemsList: View {
     let users: [User]
     let onUserTap: (User) -> Void
@@ -198,7 +193,6 @@ struct UserItemsList: View {
     }
 }
 
-// MARK: - Pagination Footer
 struct PaginationFooter: View {
     @ObservedObject var viewModel: UserListViewModel
     
@@ -215,7 +209,6 @@ struct PaginationFooter: View {
     }
 }
 
-// MARK: - Loading Page Indicator
 struct LoadingPageIndicator: View {
     var body: some View {
         HStack {
@@ -228,7 +221,6 @@ struct LoadingPageIndicator: View {
     }
 }
 
-// MARK: - All Users Loaded Indicator
 struct AllUsersLoadedIndicator: View {
     var body: some View {
         Text(Strings.Loading.allUsersLoaded)
@@ -237,7 +229,6 @@ struct AllUsersLoadedIndicator: View {
     }
 }
 
-// MARK: - Add User Button
 struct AddUserButton: View {
     @Binding var showingAddUser: Bool
     let isDisabled: Bool
@@ -253,7 +244,6 @@ struct AddUserButton: View {
     }
 }
 
-// MARK: - Retry Button
 struct RetryButton: View {
     let action: () -> Void
     
@@ -272,7 +262,6 @@ struct RetryButton: View {
     }
 }
 
-// MARK: - Refreshable Scroll View
 struct RefreshableScrollView<Content: View>: View {
     @Binding var isRefreshing: Bool
     let onRefresh: () -> Void

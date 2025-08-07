@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-// MARK: - Progress View Components
 
 struct AppProgressView: View {
     let style: ProgressStyle
@@ -44,7 +43,6 @@ struct AppProgressView: View {
     }
 }
 
-// MARK: - Convenience Extensions
 
 extension AppProgressView {
     static var primary: AppProgressView {

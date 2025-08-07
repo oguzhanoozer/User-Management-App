@@ -9,7 +9,6 @@ import Foundation
 
 @MainActor
 class UserListViewModel: ObservableObject {
-    // MARK: - Published Properties
     @Published var users: [User] = []
     @Published var isLoading = false
     @Published var error: APIError?
@@ -18,11 +17,9 @@ class UserListViewModel: ObservableObject {
     @Published var isLoadingPage = false
     @Published var hasMorePages = true
     
-    // MARK: - Private Properties
     private let pageSize = 5
     private let userService: UserServiceProtocol
     
-    // MARK: - Computed Properties
     var filteredUsers: [User] {
         return users
     }
@@ -38,12 +35,10 @@ class UserListViewModel: ObservableObject {
         return Strings.CommonErrors.unknown
     }
     
-    // MARK: - Initialization
     init() {
         self.userService = UserService()
     }
     
-    // MARK: - Public Methods
     func loadUsers() {
         print("📱 LOAD USERS - Starting load process...")
         loadUsersPage(page: 1, isRefresh: true)
@@ -84,7 +79,6 @@ class UserListViewModel: ObservableObject {
     }
 }
 
-// MARK: - Private Methods
 private extension UserListViewModel {
     
     func loadUsersPage(page: Int, isRefresh: Bool = false) {

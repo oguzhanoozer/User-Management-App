@@ -29,15 +29,7 @@ struct UserDetailView: View {
             Color.backgroundSecondary
                 .ignoresSafeArea()
             
-            if viewModel.isLoading {
-                VStack {
-                    Spacer()
-                    ProgressView("Loading user...")
-                        .progressViewStyle(CircularProgressViewStyle())
-                        .scaleEffect(1.2)
-                    Spacer()
-                }
-            } else if let user = viewModel.user {
+            if let user = viewModel.user {
                 ScrollView {
                     VStack(spacing: 0) {
                         UserDetailHeaderView(user: user, onDismiss: { dismiss() })
@@ -46,8 +38,8 @@ struct UserDetailView: View {
                             user: user,
                             isUpdating: viewModel.isUpdating,
                             isDeleting: viewModel.isDeleting,
-                            onCall: { /* Call action */ },
-                            onMessage: { /* Message action */ },
+                            onCall: {},
+                            onMessage: {},
                             onEdit: {
                                 editedName = user.name
                                 editedEmail = user.email
@@ -56,19 +48,17 @@ struct UserDetailView: View {
                             onDelete: {
                                 showingDeleteAlert = true
                             },
-                            onSendEmail: { /* Send email action */ }
+                            onSendEmail: {}
                         )
                     }
                 }
             } else if viewModel.hasError {
                 VStack {
                     Spacer()
-                    Text("Error loading user")
-                        .font(.headline)
-                        .foregroundColor(.red)
+                    
                     Text(viewModel.errorMessage)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.red)
                         .multilineTextAlignment(.center)
                         .padding()
                     

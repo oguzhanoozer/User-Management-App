@@ -10,28 +10,23 @@ import Foundation
 @MainActor
 class AddUserViewModel: ObservableObject {
     
-    // MARK: - Published Properties - Form Fields
-    @Published var name = "ozi"
-    @Published var username = "ozi"
-    @Published var email = "ozi@gmail.com"
-    @Published var phone = "5382758345"
+    @Published var name = ""
+    @Published var username = ""
+    @Published var email = ""
+    @Published var phone = ""
     
-    // MARK: - Published Properties - Validation Errors
     @Published var nameError = ""
     @Published var usernameError = ""
     @Published var emailError = ""
     @Published var phoneError = ""
     
-    // MARK: - Published Properties - UI State
     @Published var isCreating = false
     @Published var showingAlert = false
     @Published var alertMessage = ""
     @Published var isSuccess = false
     
-    // MARK: - Private Properties
     private let userService: UserServiceProtocol
     
-    // MARK: - Computed Properties
     var isFormValid: Bool {
         return areFieldsFilled && areValidationsValid
     }
@@ -45,14 +40,11 @@ class AddUserViewModel: ObservableObject {
                emailError.isEmpty && phoneError.isEmpty
     }
     
-    // MARK: - Initialization
     init(userService: UserServiceProtocol = UserService()) {
         self.userService = userService
     }
     
-    // MARK: - Public Methods
     func createUser() async -> User? {
-        logCreateUserStart()
         
         validateAllFields()
         
@@ -74,7 +66,6 @@ class AddUserViewModel: ObservableObject {
         resetValidationErrors()
     }
     
-    // MARK: - Validation Methods
     func validateName() {
         nameError = validateNameField(name)
     }
@@ -99,13 +90,9 @@ class AddUserViewModel: ObservableObject {
     }
 }
 
-// MARK: - Private Methods - User Creation
 private extension AddUserViewModel {
     
-    func logCreateUserStart() {
-        print("=== CREATE USER WITH REAL BACKEND ===")
-        print("API URL: https://jsonplaceholder.typicode.com/users")
-    }
+   
     
     func handleInvalidForm() {
         alertMessage = Strings.Validation.fillAllFields
@@ -141,7 +128,6 @@ private extension AddUserViewModel {
     }
     
     func callBackendAPI(with request: CreateUserRequest) async throws -> User {
-        print("🚀 CALLING REAL BACKEND API...")
         return try await userService.realCreateUser(request)
     }
     
@@ -180,7 +166,6 @@ private extension AddUserViewModel {
     }
 }
 
-// MARK: - Private Methods - Validation Logic
 private extension AddUserViewModel {
     
     func validateNameField(_ name: String) -> String {
@@ -238,7 +223,6 @@ private extension AddUserViewModel {
     }
 }
 
-// MARK: - Private Methods - Form Management
 private extension AddUserViewModel {
     
     func resetFormFields() {
@@ -256,7 +240,6 @@ private extension AddUserViewModel {
     }
 }
 
-// MARK: - Private Methods - Logging
 private extension AddUserViewModel {
     
     func logCreationSuccess(_ user: User) {

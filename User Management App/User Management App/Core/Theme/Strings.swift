@@ -86,15 +86,15 @@ struct Strings {
     
     struct Success {
         static func userCreated(name: String, email: String, phone: String, id: Int) -> String {
-            return "✅ User added to real backend!\n\n👤 \(name)\n📧 \(email)\n📞 \(phone)\n🆔 ID: \(id)"
+            return "✅ User added!\n\n👤 \(name)\n📧 \(email)\n📞 \(phone)\n🆔 ID: \(id)"
         }
         
         static func userUpdated(name: String, email: String) -> String {
-            return "✅ User updated in real backend!\n\n👤 New Name: \(name)\n📧 New Email: \(email)\n🌐 PUT request successful"
+            return "✅ User updated!\n\n👤 New Name: \(name)\n📧 New Email: \(email)\n🌐 PUT request successful"
         }
         
         static func userDeleted(name: String) -> String {
-            return "✅ User deleted from real backend!\n\n🗑️ \(name) is no longer in the system\n🌐 DELETE request successful"
+            return "✅ User deleted!\n\n🗑️ \(name) is no longer in the system\n🌐 DELETE request successful"
         }
     }
     

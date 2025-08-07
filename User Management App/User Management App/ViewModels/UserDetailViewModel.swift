@@ -10,7 +10,6 @@ import Foundation
 @MainActor
 class UserDetailViewModel: ObservableObject {
     
-    // MARK: - Published Properties
     @Published var user: User?
     @Published var isLoading = false
     @Published var error: APIError?
@@ -18,11 +17,9 @@ class UserDetailViewModel: ObservableObject {
     @Published var isUpdating = false
     @Published var showDeleteConfirmation = false
     
-    // MARK: - Private Properties
     private let userService: UserServiceProtocol
     private let userId: Int
     
-    // MARK: - Computed Properties
     var hasError: Bool {
         error != nil
     }
@@ -38,13 +35,11 @@ class UserDetailViewModel: ObservableObject {
         !isLoading && !isDeleting && !isUpdating
     }
     
-    // MARK: - Initialization
     init(userId: Int) {
         self.userId = userId
         self.userService = UserService()
     }
     
-    // MARK: - Public Methods
     func loadUser() {
         guard !isLoading else {
             print("⚠️ LoadUser blocked - already loading")
@@ -85,7 +80,6 @@ class UserDetailViewModel: ObservableObject {
     }
 }
 
-// MARK: - Private Methods - User Loading
 private extension UserDetailViewModel {
     
     var canUpdate: Bool {
@@ -139,7 +133,6 @@ private extension UserDetailViewModel {
     }
 }
 
-// MARK: - Private Methods - User Update
 private extension UserDetailViewModel {
     
     func performUserUpdate(name: String, email: String) async -> Bool {
@@ -198,7 +191,6 @@ private extension UserDetailViewModel {
     }
 }
 
-// MARK: - Private Methods - User Deletion
 private extension UserDetailViewModel {
     
     func performUserDeletion() async -> Bool {
@@ -240,7 +232,6 @@ private extension UserDetailViewModel {
     }
 }
 
-// MARK: - Private Methods - State Management
 private extension UserDetailViewModel {
     
     func logRetryState() {

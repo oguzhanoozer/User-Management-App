@@ -98,7 +98,6 @@ class UserService: UserServiceProtocol {
         )
         let updatedUser = User.fromRequest(createRequest, id: id)
         
-        // First call the API - if it fails, throw error
         do {
             if useMockData {
                 print("🎯 Using mock update")
@@ -113,7 +112,6 @@ class UserService: UserServiceProtocol {
             throw error
         }
         
-        // Only update local data if API call succeeded
         await MainActor.run {
             if let index = self.apiUsers.firstIndex(where: { $0.id == id }) {
                 self.apiUsers[index] = updatedUser
@@ -128,7 +126,6 @@ class UserService: UserServiceProtocol {
     func deleteUser(id: Int) async throws -> DeleteUserResponse {
         print("🗑️ UserService.deleteUser called for id: \(id)")
         
-        // First call the API - if it fails, throw error
         do {
             if useMockData {
                 print("🎯 Using mock delete")
@@ -143,7 +140,6 @@ class UserService: UserServiceProtocol {
             throw error
         }
         
-        // Only update local data if API call succeeded
         await MainActor.run {
             if self.apiUsers.contains(where: { $0.id == id }) {
                 self.deletedUserIds.insert(id)
@@ -195,15 +191,12 @@ extension UserService {
         print("🎯 realGetUsers called - page: \(page), limit: \(limit)")
         
         let url =  APIConfiguration.baseURL + APIEndpoint.users.path
-        print("************************ \(url)")
         let parameters: [String: Any] = [
             "_page": page,
             "_limit": limit
         ]
         
-        print("🎯 URL: \(url)")
-        print("🎯 Parameters: \(parameters)")
-        print("🚀 BACKEND PAGINATION API CALL:")
+        
         print("GET \(url)?_page=\(page)&_limit=\(limit)")
         
         return try await withRetry(maxAttempts: 3, delay: 1.0) {
@@ -326,7 +319,6 @@ extension UserService {
         try await Task.sleep(nanoseconds: 500_000_000)
     }
     
-    // MARK: - Retry Mechanism
     private func withRetry<T>(
         maxAttempts: Int,
         delay: TimeInterval,
@@ -344,11 +336,9 @@ extension UserService {
                 return result
             } catch {
                 lastError = error
-                print("❌ Attempt \(attempt) failed: \(error)")
                 
-                // Son deneme değilse bekle
                 if attempt < maxAttempts {
-                    let retryDelay = delay * Double(attempt) // Exponential backoff
+                    let retryDelay = delay * Double(attempt)
                     print("⏳ Retrying in \(retryDelay) seconds...")
                     try await Task.sleep(nanoseconds: UInt64(retryDelay * 1_000_000_000))
                 }

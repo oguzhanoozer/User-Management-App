@@ -44,7 +44,6 @@ struct AddUserView: View {
     }
 }
 
-// MARK: - Main Form View
 struct MainFormView: View {
     @ObservedObject var viewModel: AddUserViewModel
     let onUserAdded: (User) -> Void
@@ -74,13 +73,10 @@ struct MainFormView: View {
     }
 }
 
-// MARK: - Header Section
 struct HeaderSection: View {
     var body: some View {
         VStack(spacing: Spacing.sm) {
-            Image(systemName: "person.badge.plus")
-                .iconSize(Layout.iconXLarge)
-                .foregroundColor(.primaryBlue)
+            
             
             Text(Strings.FormSections.newUser)
                 .primaryTitleStyle()
@@ -92,7 +88,6 @@ struct HeaderSection: View {
     }
 }
 
-// MARK: - User Info Form Section
 struct UserInfoFormSection: View {
     @ObservedObject var viewModel: AddUserViewModel
     
@@ -108,7 +103,6 @@ struct UserInfoFormSection: View {
     }
 }
 
-// MARK: - Form Fields
 struct NameField: View {
     @ObservedObject var viewModel: AddUserViewModel
     
@@ -176,7 +170,6 @@ struct PhoneField: View {
     }
 }
 
-// MARK: - Action Buttons Section
 struct ActionButtonsSection: View {
     @ObservedObject var viewModel: AddUserViewModel
     let onCreateUser: () -> Void
@@ -191,14 +184,12 @@ struct ActionButtonsSection: View {
             CancelFormButton(
                 isDisabled: viewModel.isCreating,
                 onCancel: {
-                    // Handle cancel from form body
                 }
             )
         }
     }
 }
 
-// MARK: - Create User Button
 struct CreateUserButton: View {
     @ObservedObject var viewModel: AddUserViewModel
     let onCreateUser: () -> Void
@@ -229,7 +220,6 @@ struct CreateUserButton: View {
     }
 }
 
-// MARK: - Cancel Buttons
 struct CancelButton: View {
     let isDisabled: Bool
     let onCancel: () -> Void
@@ -263,7 +253,6 @@ struct CancelFormButton: View {
     }
 }
 
-// MARK: - Loading Overlay
 struct LoadingOverlay: View {
     var body: some View {
         ZStack {
@@ -296,7 +285,6 @@ struct LoadingContent: View {
     }
 }
 
-// MARK: - Alert Buttons
 struct AlertButtons: View {
     @ObservedObject var viewModel: AddUserViewModel
     let onUserAdded: (User) -> Void
@@ -322,7 +310,6 @@ struct AlertButtons: View {
     }
 }
 
-// MARK: - Form Section View
 struct FormSectionView<Content: View>: View {
     let title: String
     let content: Content
@@ -365,7 +352,6 @@ struct SectionContent<Content: View>: View {
     }
 }
 
-// MARK: - Form Field View
 struct FormFieldView: View {
     let title: String
     @Binding var text: String
@@ -405,7 +391,7 @@ struct FieldInput: View {
     let maxLength: Int?
     
     var body: some View {
-        TextField(placeholder, text: $text)
+        TextField(placeholder, text: $text,prompt: Text(placeholder).foregroundColor(.gray))
             .padding()
             .background(Color.backgroundSecondary)
             .overlay(

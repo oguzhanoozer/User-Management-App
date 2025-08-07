@@ -42,21 +42,21 @@ enum APIError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "Invalid URL"
+            return Strings.Errors.invalidURL
         case .noData:
-            return "No data received"
+            return Strings.Errors.serverResponse
         case .decodingError(let message):
-            return "Decoding error: \(message)"
+            return Strings.Errors.invalidURL
         case .networkError(let message):
-            return "Network error: \(message)"
+            return Strings.Errors.general
         case .serverError(let code, let message):
-            return "Server error (\(code)): \(message)"
+            return Strings.Errors.serverError(code, message)
         case .timeoutError:
-            return "Request timeout"
+            return Strings.Errors.general
         case .noInternetConnection:
-            return "No internet connection"
+            return Strings.Errors.general
         case .unknown(let message):
-            return "Unknown error: \(message)"
+            return Strings.Errors.general
         }
     }
     
